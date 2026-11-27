@@ -11,11 +11,12 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Persistent skill catalog and database migrations
 - [ ] Dependency-aware planner, bounded concurrency and cancellation
 - [ ] Structured task state, idempotency and durable execution queue
-- [ ] API versioning and generated API documentation
+- [x] Versioned authenticated task API scaffold (`/v1`); per-user identity and generated client docs remain open
 
 ## B. Security and identity
-- [ ] Authentication, session lifecycle and account recovery
-- [ ] Server-side authorization and tenant/object isolation
+- [x] Shared server-side bearer-token gate for controlled API deployments (not suitable as public multi-user identity)
+- [ ] User authentication, session lifecycle and account recovery
+- [ ] Server-side per-user authorization and tenant/object isolation
 - [ ] Permission scopes, approval inbox and revocation
 - [ ] Secret manager and credential rotation
 - [ ] Threat model, security tests and audit events
@@ -80,7 +81,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. OpenAI, Anthropic Claude, xAI Grok and DeepSeek provider adapters plus a configurable multi-provider gateway now exist with mocked contract tests. This is not a production-ready application; live provider credentials are not configured and no live model call has been verified. Specialist department workflows, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
+Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. OpenAI, Anthropic Claude, xAI Grok and DeepSeek provider adapters plus a configurable multi-provider gateway now exist with mocked contract tests. This is not a production-ready application; live provider credentials are not configured and no live model call has been verified. A versioned FastAPI task API with a shared server-side bearer-token gate has been added for controlled testing. It is not per-user authentication and does not isolate task ownership. Specialist department workflows, user authentication/authorization, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
 
 ## J. End-to-end capability targets
 - [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests
@@ -91,7 +92,8 @@ Implemented foundations: deterministic planner/orchestrator, approval-policy fou
 - [ ] Complete persistent database for identity, tasks, skills, permissions and audit history
 - [ ] Adaptive object/file storage with capacity, cost, backup and restore controls
 - [ ] Learning and Research Engine with provenance, freshness and reviewed improvements
-- [ ] Authentication and server-enforced authorization across all data and actions
+- [x] Versioned FastAPI task endpoints with shared server-side bearer authentication for controlled use
+- [ ] User-scoped authentication and server-enforced authorization across all data and actions
 - [ ] Native Kotlin Android app connected to authenticated APIs
 - [ ] Real implementations for every department, with evidence and tests
 - [ ] End-to-end acceptance tests from Android/API through brain, model, department/skill, storage and verified result

@@ -14,6 +14,7 @@ from .skills import (
     validate_manifest,
 )
 from .storage import SQLiteTaskStore, StoredTask
+from .service import TaskExecutionService
 
 __all__ = [
     "BrainExecutionReport", "DepartmentHandler", "DepartmentRegistry", "ModelDepartmentHandler", "execute_plan", "register_model_departments",
@@ -23,5 +24,5 @@ __all__ = [
     "ModelAuthenticationError", "ModelRequestError", "OpenAIResponsesProvider", "create_default_model_gateway",
     "Action", "ApprovalRequired", "authorize_action",
     "RegisteredSkill", "SkillManifest", "SkillRegistry", "SkillStatus",
-    "SkillValidationError", "validate_manifest", "SQLiteTaskStore", "StoredTask",
+    "SkillValidationError", "validate_manifest", "SQLiteTaskStore", "StoredTask", "TaskExecutionService",
 ]

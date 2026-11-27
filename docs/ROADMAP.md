@@ -14,6 +14,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Optional source-provenance research-search skill when a search provider is configured
 - [ ] Versioned schema migrations and dependency-aware planner
 - [x] Single-worker lifecycle, authenticated async submission/status API, durable queue-to-result synchronization and queued-task cancellation
+- [x] Owner-scoped durable task progress events, lease-bound monotonic progress updates and async status exposure
 - [ ] Bounded multi-worker concurrency, running-task cooperative cancellation and lease renewal
 - [x] Durable SQLite queue primitives: atomic claims, expiring leases, bounded retries and owner-checked queued cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
@@ -58,6 +59,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Registration/login, current-session validation, logout and task submission client
 - [x] HTTPS-only API client and Keystore-backed encrypted session persistence
 - [ ] Configure real HTTPS backend domain and verify live Android-to-API-to-Brain workflow
+- [x] Android async task submission, status polling and queued-task cancellation controls
 - [ ] Android unified chat-history screen consuming the task-history API and async task endpoints, projects, attachments, live task progress/cancellation and result views
 - [ ] Approval inbox, skills catalog, permissions, storage/usage/privacy dashboard
 - [ ] Hindi/English localization and accessibility
@@ -82,7 +84,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Security review, gradual release, monitoring, rollback and support
 
 ## Current implementation status
-AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport, Keystore-backed token encryption, a recent per-user task-history screen, and polling of persisted task status while synchronous task execution is running. A runtime factory composes backend services, enables optional Tavily research from server configuration, and exposes a governed skill engine. The Android debug APK CI workflow passed after earlier integration changes, but no live mobile-to-deployed-backend workflow is verified. The backend includes a bounded authenticated task-history endpoint that returns only the caller's own recent tasks, plus user-owned text knowledge storage with FTS5 search, a built-in knowledge-search skill scoped to the authenticated user, and an optional research-search skill that returns source provenance when a provider is configured. Skills execute only through trusted host-registered operations, with active-state checks, input/output validation, server-resolved permission scopes, approval for consequential scopes and minimal audit digests. This is an allowlisted dispatcher, not an OS sandbox; no uploaded or model-generated code is executed. Research and model provider tests are mocked, not live credential verification. The backend now also exposes authenticated async task enqueue/status/queued-cancel routes backed by the durable SQLite queue and a single explicitly lifecycle-managed worker. The runtime starts/stops that worker with FastAPI; synchronous submission remains supported. Running-task cancellation, multi-worker concurrency, lease renewal, Android async-task integration and production deployment remain incomplete. No public API domain, isolated coding sandbox, autonomous learning loop, complete file/document storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
+AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport, Keystore-backed token encryption, a recent per-user task-history screen, and polling of persisted task status while synchronous task execution is running. A runtime factory composes backend services, enables optional Tavily research from server configuration, and exposes a governed skill engine. The Android debug APK CI workflow passed after earlier integration changes, but no live mobile-to-deployed-backend workflow is verified. The backend includes a bounded authenticated task-history endpoint that returns only the caller's own recent tasks, plus user-owned text knowledge storage with FTS5 search, a built-in knowledge-search skill scoped to the authenticated user, and an optional research-search skill that returns source provenance when a provider is configured. Skills execute only through trusted host-registered operations, with active-state checks, input/output validation, server-resolved permission scopes, approval for consequential scopes and minimal audit digests. This is an allowlisted dispatcher, not an OS sandbox; no uploaded or model-generated code is executed. Research and model provider tests are mocked, not live credential verification. The backend now also exposes authenticated async task enqueue/status/queued-cancel routes backed by the durable SQLite queue and a single explicitly lifecycle-managed worker. The runtime starts/stops that worker with FastAPI; synchronous submission remains supported. Running-task cancellation, multi-worker concurrency, lease renewal, model-streaming progress, Android progress-event rendering and production deployment remain incomplete. No public API domain, isolated coding sandbox, autonomous learning loop, complete file/document storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
 
 ## J. End-to-end capability targets
 - [x] Model adapters and mocked provider contract tests
@@ -94,7 +96,8 @@ AJUSTA now has a user-session FastAPI mode with registration/login/logout/curren
 - [x] Native Android login/task client and successful debug APK build
 - [x] Optional source-backed Research handler with Tavily search adapter
 - [ ] Per-user authenticated live Android-to-Brain workflow against a deployed HTTPS API
-- [ ] Central Brain with model routing, dependency graphs, progress, cancellation and result evaluation
+- [ ] Central Brain with model routing, dependency graphs, cooperative cancellation and result evaluation
+- [x] Durable queue lifecycle progress events with owner-scoped status API
 - [x] Governed allowlisted skill dispatcher with schema validation, server-side permission resolution, approval gates and minimal audit digests
 - [ ] Isolated skill/code sandbox with hard resource limits, full review/evaluation pipeline and rollback
 - [ ] Complete multi-user database, adaptive object/file storage, backups and restore

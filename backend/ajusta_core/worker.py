@@ -55,7 +55,13 @@ class DurableTaskWorker:
         if item is None:
             return False
         try:
+            self._queue.report_progress(
+                item.task_id, item.lease_token, 10, "Task dispatched to trusted handler"
+            )
             self._handler(item)
+            self._queue.report_progress(
+                item.task_id, item.lease_token, 95, "Handler returned; saving result"
+            )
         except Exception as exc:
             _LOG.exception("AJUSTA task handler failed for task %s", item.task_id)
             self._queue.complete(

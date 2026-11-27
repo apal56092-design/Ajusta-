@@ -1,7 +1,6 @@
-"""Durable SQLite queue primitives for bounded background task workers.
+"""Durable, owner-scoped SQLite queue and progress event store.
 
-This module stores task payloads and leases only. It never executes payloads or code.
-A trusted application worker must validate and dispatch claimed work.
+Queue payloads are data only. Trusted host application code performs all execution.
 """
 from __future__ import annotations
 
@@ -22,10 +21,12 @@ class QueueItem:
     attempts: int
     lease_token: str | None
     lease_until: float | None
+    progress_percent: int = 0
+    progress_message: str = "Queued"
 
 
 class SQLiteTaskQueue:
-    """File-backed, owner-scoped queue with atomic claims and expiring leases."""
+    """File-backed queue with atomic claims, leases, and append-only progress events."""
 
     def __init__(self, database_path: str | Path, *, max_attempts: int = 3) -> None:
         if not isinstance(max_attempts, int) or isinstance(max_attempts, bool) or not 1 <= max_attempts <= 10:
@@ -37,18 +38,24 @@ class SQLiteTaskQueue:
         self.max_attempts = max_attempts
         with self._connect() as db:
             db.execute("""CREATE TABLE IF NOT EXISTS task_queue (
-                task_id TEXT PRIMARY KEY,
-                owner_id TEXT NOT NULL,
-                payload_json TEXT NOT NULL,
+                task_id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, payload_json TEXT NOT NULL,
                 status TEXT NOT NULL CHECK(status IN ('queued','running','succeeded','failed','cancelled')),
-                attempts INTEGER NOT NULL DEFAULT 0,
-                lease_token TEXT,
-                lease_until REAL,
-                created_at REAL NOT NULL,
-                updated_at REAL NOT NULL,
-                error TEXT
+                attempts INTEGER NOT NULL DEFAULT 0, lease_token TEXT, lease_until REAL,
+                created_at REAL NOT NULL, updated_at REAL NOT NULL, error TEXT,
+                progress_percent INTEGER NOT NULL DEFAULT 0, progress_message TEXT NOT NULL DEFAULT 'Queued'
             )""")
+            columns = {row["name"] for row in db.execute("PRAGMA table_info(task_queue)")}
+            if "progress_percent" not in columns:
+                db.execute("ALTER TABLE task_queue ADD COLUMN progress_percent INTEGER NOT NULL DEFAULT 0")
+            if "progress_message" not in columns:
+                db.execute("ALTER TABLE task_queue ADD COLUMN progress_message TEXT NOT NULL DEFAULT 'Queued'")
             db.execute("CREATE INDEX IF NOT EXISTS task_queue_claim_idx ON task_queue(status, created_at)")
+            db.execute("""CREATE TABLE IF NOT EXISTS task_progress_events (
+                event_id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL,
+                owner_id TEXT NOT NULL, status TEXT NOT NULL, progress_percent INTEGER NOT NULL,
+                message TEXT NOT NULL, created_at REAL NOT NULL
+            )""")
+            db.execute("CREATE INDEX IF NOT EXISTS task_progress_owner_idx ON task_progress_events(task_id, owner_id, event_id)")
 
     def _connect(self):
         db = sqlite3.connect(self.database_path, timeout=10, isolation_level=None)
@@ -61,7 +68,14 @@ class SQLiteTaskQueue:
         if not isinstance(payload, dict):
             raise ValueError("queued payload must be an object")
         return QueueItem(row["task_id"], row["owner_id"], payload, row["status"],
-                         row["attempts"], row["lease_token"], row["lease_until"])
+                         row["attempts"], row["lease_token"], row["lease_until"],
+                         row["progress_percent"], row["progress_message"])
+
+    @staticmethod
+    def _event(db, task_id, owner_id, status, percent, message, now):
+        db.execute("""INSERT INTO task_progress_events
+            (task_id,owner_id,status,progress_percent,message,created_at) VALUES(?,?,?,?,?,?)""",
+            (task_id, owner_id, status, percent, message[:300], now))
 
     def enqueue(self, task_id: str, owner_id: str, payload: dict) -> QueueItem:
         if not isinstance(task_id, str) or not task_id.strip() or len(task_id) > 100:
@@ -76,10 +90,12 @@ class SQLiteTaskQueue:
         now = time.time()
         with self._connect() as db:
             try:
-                db.execute("INSERT INTO task_queue(task_id,owner_id,payload_json,status,created_at,updated_at) VALUES(?,?,?,'queued',?,?)",
-                           (task_id.strip(), owner_id, encoded, now, now))
+                db.execute("""INSERT INTO task_queue
+                    (task_id,owner_id,payload_json,status,created_at,updated_at)
+                    VALUES(?,?,?,'queued',?,?)""", (task_id.strip(), owner_id, encoded, now, now))
             except sqlite3.IntegrityError as exc:
                 raise ValueError("task already exists in queue") from exc
+            self._event(db, task_id.strip(), owner_id, "queued", 0, "Waiting for a worker", now)
             row = db.execute("SELECT * FROM task_queue WHERE task_id=?", (task_id.strip(),)).fetchone()
         return self._item(row)
 
@@ -91,49 +107,98 @@ class SQLiteTaskQueue:
         now = time.time()
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
+            expired = db.execute("""SELECT task_id,owner_id,attempts FROM task_queue
+                WHERE status='running' AND lease_until <= ?""", (now,)).fetchall()
             db.execute("""UPDATE task_queue SET status=CASE WHEN attempts >= ? THEN 'failed' ELSE 'queued' END,
-                          lease_token=NULL, lease_until=NULL, updated_at=?,
-                          error=CASE WHEN attempts >= ? THEN 'Worker lease expired; retry limit reached.' ELSE error END
-                          WHERE status='running' AND lease_until <= ?""",
-                       (self.max_attempts, now, self.max_attempts, now))
+                lease_token=NULL, lease_until=NULL, updated_at=?,
+                error=CASE WHEN attempts >= ? THEN 'Worker lease expired; retry limit reached.' ELSE error END,
+                progress_message=CASE WHEN attempts >= ? THEN 'Worker lease expired; retry limit reached.' ELSE 'Retrying after worker lease expiry' END
+                WHERE status='running' AND lease_until <= ?""",
+                (self.max_attempts, now, self.max_attempts, self.max_attempts, now))
+            for item in expired:
+                status = "failed" if item["attempts"] >= self.max_attempts else "queued"
+                self._event(db, item["task_id"], item["owner_id"], status, 0,
+                            "Worker lease expired; task failed" if status == "failed" else "Retrying after worker lease expiry", now)
             row = db.execute("SELECT * FROM task_queue WHERE status='queued' ORDER BY created_at, task_id LIMIT 1").fetchone()
             if row is None:
                 db.commit()
                 return None
             token = uuid4().hex
             updated = db.execute("""UPDATE task_queue SET status='running', attempts=attempts+1,
-                                    lease_token=?, lease_until=?, updated_at=?
-                                    WHERE task_id=? AND status='queued'""",
-                                 (token, now + lease_seconds, now, row["task_id"]))
+                lease_token=?, lease_until=?, updated_at=?, progress_percent=5, progress_message='Worker started'
+                WHERE task_id=? AND status='queued'""", (token, now + lease_seconds, now, row["task_id"]))
             if updated.rowcount != 1:
                 db.rollback()
                 return None
+            self._event(db, row["task_id"], row["owner_id"], "running", 5, "Worker started", now)
             claimed = db.execute("SELECT * FROM task_queue WHERE task_id=?", (row["task_id"],)).fetchone()
             db.commit()
         return self._item(claimed)
+
+    def report_progress(self, task_id: str, lease_token: str, progress_percent: int, message: str) -> bool:
+        if not isinstance(progress_percent, int) or isinstance(progress_percent, bool) or not 0 <= progress_percent <= 99:
+            raise ValueError("progress_percent must be between 0 and 99")
+        if not isinstance(message, str) or not message.strip() or len(message) > 300:
+            raise ValueError("progress message must contain 1 to 300 characters")
+        now = time.time()
+        with self._connect() as db:
+            row = db.execute("""SELECT owner_id,progress_percent FROM task_queue
+                WHERE task_id=? AND status='running' AND lease_token=?""", (task_id, lease_token)).fetchone()
+            if row is None or progress_percent < row["progress_percent"]:
+                return False
+            db.execute("""UPDATE task_queue SET progress_percent=?, progress_message=?, updated_at=?
+                WHERE task_id=? AND status='running' AND lease_token=?""",
+                (progress_percent, message, now, task_id, lease_token))
+            self._event(db, task_id, row["owner_id"], "running", progress_percent, message, now)
+            return True
 
     def complete(self, task_id: str, lease_token: str, *, succeeded: bool, error: str | None = None) -> bool:
         if not isinstance(succeeded, bool):
             raise TypeError("succeeded must be a boolean")
         status = "succeeded" if succeeded else "failed"
         safe_error = error[:500] if isinstance(error, str) else None
+        now = time.time()
+        message = "Task completed" if succeeded else "Task failed"
         with self._connect() as db:
+            row = db.execute("""SELECT owner_id,progress_percent FROM task_queue
+                WHERE task_id=? AND status='running' AND lease_token=?""", (task_id, lease_token)).fetchone()
+            if row is None:
+                return False
+            percent = 100 if succeeded else row["progress_percent"]
             cursor = db.execute("""UPDATE task_queue SET status=?, error=?, lease_token=NULL,
-                                   lease_until=NULL, updated_at=?
-                                   WHERE task_id=? AND status='running' AND lease_token=?""",
-                                (status, safe_error, time.time(), task_id, lease_token))
-            return cursor.rowcount == 1
+                lease_until=NULL, updated_at=?, progress_percent=?, progress_message=?
+                WHERE task_id=? AND status='running' AND lease_token=?""",
+                (status, safe_error, now, percent, message, task_id, lease_token))
+            if cursor.rowcount == 1:
+                self._event(db, task_id, row["owner_id"], status, percent, message, now)
+                return True
+            return False
 
     def cancel(self, task_id: str, owner_id: str) -> bool:
-        """Cancel queued work; running work requires cooperative worker cancellation."""
+        now = time.time()
         with self._connect() as db:
-            cursor = db.execute("""UPDATE task_queue SET status='cancelled', updated_at=?
-                                   WHERE task_id=? AND owner_id=? AND status='queued'""",
-                                (time.time(), task_id, owner_id))
-            return cursor.rowcount == 1
+            row = db.execute("""SELECT progress_percent FROM task_queue
+                WHERE task_id=? AND owner_id=? AND status='queued'""", (task_id, owner_id)).fetchone()
+            if row is None:
+                return False
+            cursor = db.execute("""UPDATE task_queue SET status='cancelled', updated_at=?,
+                progress_message='Cancelled before execution'
+                WHERE task_id=? AND owner_id=? AND status='queued'""", (now, task_id, owner_id))
+            if cursor.rowcount == 1:
+                self._event(db, task_id, owner_id, "cancelled", row["progress_percent"], "Cancelled before execution", now)
+                return True
+            return False
 
     def get(self, task_id: str, owner_id: str) -> QueueItem | None:
         with self._connect() as db:
-            row = db.execute("SELECT * FROM task_queue WHERE task_id=? AND owner_id=?",
-                             (task_id, owner_id)).fetchone()
+            row = db.execute("SELECT * FROM task_queue WHERE task_id=? AND owner_id=?", (task_id, owner_id)).fetchone()
         return self._item(row) if row else None
+
+    def list_events(self, task_id: str, owner_id: str, *, limit: int = 50) -> list[dict]:
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        with self._connect() as db:
+            rows = db.execute("""SELECT event_id,status,progress_percent,message,created_at
+                FROM task_progress_events WHERE task_id=? AND owner_id=?
+                ORDER BY event_id DESC LIMIT ?""", (task_id, owner_id, limit)).fetchall()
+        return [dict(row) for row in reversed(rows)]

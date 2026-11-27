@@ -3,6 +3,7 @@
 This first storage layer saves explicitly supplied text and provenance metadata only;
 it does not claim semantic search, document ingestion, or model training.
 """
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import sqlite3
@@ -39,10 +40,15 @@ class SQLiteKnowledgeStore:
                 "ON knowledge_records(user_id, created_at DESC, id)"
             )
 
+    @contextmanager
     def _connect(self):
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     @staticmethod
     def _record(row: sqlite3.Row) -> KnowledgeRecord:

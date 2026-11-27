@@ -108,3 +108,43 @@ def test_app_refuses_empty_server_token(tmp_path):
     )
     with pytest.raises(ValueError, match="token"):
         create_app(service, api_token=" ")
+
+
+def test_skill_catalog_requires_authentication(client):
+    response = client.get("/v1/skills")
+    assert response.status_code == 401
+
+
+def test_skill_catalog_returns_only_active_skill_metadata(client, tmp_path):
+    from ajusta_core.skills import SkillManifest
+    from ajusta_core.skill_store import SQLiteSkillStore
+
+    skill_store = SQLiteSkillStore(tmp_path / "catalog.sqlite3")
+    skill_store.register(SkillManifest(
+        name="research_digest", version="1.0.0",
+        description="Summarize approved sources",
+        input_schema={"type": "object"}, output_schema={"type": "object"},
+        permissions=("knowledge.read",),
+    ))
+    skill_store.register(SkillManifest(
+        name="draft_tool", version="1.0.0",
+        description="A draft skill", input_schema={"type": "object"},
+        output_schema={"type": "object"},
+    ))
+    skill_store.approve("research_digest")
+    skill_store.activate("research_digest")
+
+    store = SQLiteTaskStore(tmp_path / "catalog-api.sqlite3")
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    service = TaskExecutionService(store=store, registry=registry, enabled_departments={"research"})
+    app = create_app(service, api_token="test-server-token", skill_store=skill_store)
+    response = TestClient(app).get(
+        "/v1/skills", headers={"Authorization": "Bearer test-server-token"}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"skills": [{
+        "name": "research_digest", "version": "1.0.0",
+        "description": "Summarize approved sources", "permissions": ["knowledge.read"],
+    }]}

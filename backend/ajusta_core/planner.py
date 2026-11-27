@@ -31,7 +31,7 @@ def plan_request(request: str, departments=DEFAULT_DEPARTMENTS) -> TaskPlan:
     """Create a bounded plan from text. Routing is keyword-based and explainable."""
     if not isinstance(request, str):
         raise TypeError("request must be a string")
-    objective = re.sub(r"\s+", " ", request).strip()
+    objective = re.sub(r"\\s+", " ", request).strip()
     if not objective:
         raise ValueError("request must not be empty")
     if len(objective) > 4000:

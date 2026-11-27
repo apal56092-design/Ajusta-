@@ -329,6 +329,8 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         require_user_session(user)
         if task_queue is None:
             raise HTTPException(status_code=503, detail="Background task execution is not configured.")
+        if service.get_task(body.task_id, user_id=user.user_id) is not None:
+            raise HTTPException(status_code=409, detail="Task ID already exists.")
         try:
             request = TaskRequest(instruction=body.instruction, constraints=tuple(body.constraints),
                                   output_format=body.output_format)

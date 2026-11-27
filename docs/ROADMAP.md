@@ -21,10 +21,10 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Threat model, security tests and audit events
 
 ## C. AI providers and routing
-- [ ] Provider-neutral model adapter
+- [x] Provider-neutral model adapter and bounded request/response contract
 - [ ] Model capability registry and routing policy
 - [ ] Timeouts, bounded retries, quotas, budgets and cost reporting
-- [ ] Provider fallback and emergency disable
+- [x] Provider fallback only for declared transient unavailability\n- [ ] Emergency provider disable and operator controls
 - [ ] User-visible disclosure of external processing and consent
 
 ## D. Skills and departments
@@ -78,11 +78,11 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. This is not a production-ready application. Real AI providers, specialist departments, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
+Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. This is not a production-ready application. A concrete OpenAI Responses adapter and model-backed department-handler bridge now exist, but live provider credentials are not configured. Specialist department workflows, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
 
 ## J. End-to-end capability targets
-- [ ] Real AI model adapters with secure server-side secrets and verified integration tests
-- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
+- [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests\n- [ ] Live provider integration test with deployment-managed credentials
+- [x] Model-backed department-handler bridge into the central Brain (single bounded model request; no tool execution)\n- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
 - [ ] Secure Skill Execution Engine with isolation, permissions, resource limits, audit, approval and rollback
 - [ ] Complete persistent database for identity, tasks, skills, permissions and audit history
 - [ ] Adaptive object/file storage with capacity, cost, backup and restore controls

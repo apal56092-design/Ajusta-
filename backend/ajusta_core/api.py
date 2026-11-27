@@ -361,11 +361,17 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         item = task_queue.get(task_id, user.user_id)
         if item is None:
             raise HTTPException(status_code=404, detail="Task not found.")
+        events = task_queue.list_events(task_id, user.user_id, limit=50)
+        progress = {
+            "progress_percent": item.progress_percent,
+            "progress_message": item.progress_message,
+            "progress_events": events,
+        }
         stored = service.get_task(task_id, user_id=user.user_id)
         if stored is not None and stored.status.value in {"succeeded", "failed", "needs_approval"}:
-            return _result_payload(stored)
+            return {**_result_payload(stored), **progress}
         return {"task_id": task_id, "status": item.status, "result": None,
-                "evidence": [], "error_code": None, "error_message": None}
+                "evidence": [], "error_code": None, "error_message": None, **progress}
 
     @app.delete("/v1/tasks/async/{task_id}", status_code=200)
     def cancel_async_task(task_id: str, user=Depends(identity)):

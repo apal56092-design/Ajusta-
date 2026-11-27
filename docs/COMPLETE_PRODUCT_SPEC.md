@@ -148,4 +148,57 @@ AJUSTA is not production-ready until critical user journeys work end-to-end; aut
 - No claim that every AI provider, skill or external service is connected until tested.
 - No claim of learning from user data without transparent consent and governance.
 
-The goal is maximal useful capability with verifiable limits, user control and continual improvement.
+
+## 17. Required end-to-end capability groups
+The following are explicit product requirements, not claims of current implementation:
+
+### 17.1 Real AI model connectivity
+- Implement provider-neutral adapters for selected real model services and, where practical, local models.
+- Keep credentials server-side; never embed API keys in the Android app or repository.
+- Support capability-aware routing, timeouts, bounded retries, rate limits, budget controls, provider health and fallback.
+- Surface the model/provider used, relevant data-transfer notice, cost where available and failure state.
+- Verify each integration with safe integration tests before marking it connected.
+
+### 17.2 AI Brain and orchestration
+- Build a central brain that converts a goal into typed tasks, dependencies, department assignments and acceptance criteria.
+- Coordinate specialist departments, model adapters, tools, knowledge retrieval and the skill engine through versioned interfaces.
+- Support bounded parallel execution, progress events, cancellation, retries, partial results and final result validation.
+- Preserve task provenance so users can inspect which model, skill, source or tool contributed to an outcome.
+- Never represent a plan, simulation or draft as completed real-world execution.
+
+### 17.3 Secure skill execution engine
+- Separate skill metadata/registry from execution runtime.
+- Execute only reviewed, version-pinned skills in isolated sandboxes with explicit permission scopes, filesystem/network controls, CPU/memory/time limits and dependency allowlists.
+- Require user approval for sensitive actions; log execution, inputs/outputs metadata, permission decisions and failures with secrets redacted.
+- Provide test/evaluation gates, disable/revoke, rollback and emergency kill switch.
+- Never run arbitrary generated or downloaded code directly in the backend process.
+
+### 17.4 Persistent database and adaptive storage
+- Add durable relational persistence for users, tasks, permissions, skills, audit records and configuration, plus object storage for files where needed.
+- Use replaceable storage adapters and configurable local/cloud deployment; select storage based on data class, latency, availability, privacy, capacity and cost.
+- Add encryption, tenant isolation, migrations, backups, tested restoration, retention, export and deletion across primary data, indexes and backups.
+- Report actual capacity, quotas, usage and projected cost. Storage is elastic only within configured infrastructure, provider limits and budget; it is not infinite.
+
+### 17.5 Learning and research engine
+- Build evidence-based research workflows with source capture, provenance, freshness checks, claim-to-source mapping and uncertainty reporting.
+- Treat learning as a controlled improvement loop: detect a capability gap, research options, draft a skill/change, test in isolation, evaluate against benchmarks, request review/approval, version and release, then monitor and roll back if needed.
+- Do not silently train on user data or modify production behavior without the required consent, review and release controls.
+
+### 17.6 Authentication and complete permission system
+- Implement secure account/session lifecycle, revocation, recovery protections and MFA/passkeys where supported.
+- Enforce server-side role, tenant, resource and action-level authorization; apply least privilege to every department, skill, connector and storage operation.
+- Support scoped grants, expiry, user-visible approvals, audit history and immediate permission/credential revocation.
+- Test cross-user isolation, privilege escalation resistance and denied-by-default behavior.
+
+### 17.7 Kotlin Android application
+- Deliver a native Kotlin Android client using authenticated, versioned backend APIs.
+- Include sign-in, chat/task workspace, task plan/progress, file inputs, results/evidence, approvals, skills/permissions, storage/usage and privacy controls.
+- Protect local session material using Android security facilities; request device permissions only when a feature needs them and explain why.
+- Support Hindi and English, accessibility, low-bandwidth behavior and supported Android-version testing.
+
+### 17.8 Real department execution
+- Each department must expose a typed execution contract, declared capabilities/permissions, health state, bounded resource policy and structured result/evidence format.
+- Research, Coding, Design, Data, Business, Writing/Knowledge and Automation must perform actual scoped work through approved models/tools rather than merely appear in a routing plan.
+- Add department-specific unit/integration tests and end-to-end workflows; clearly report unavailable, partial, failed or approval-required work.
+
+A capability group is complete only after implementation, security review appropriate to its risk, automated tests and documented runtime verification. The roadmap is the source of delivery status.

@@ -186,3 +186,25 @@ def test_knowledge_records_are_private_to_the_authenticated_user(tmp_path):
     assert client.delete(f"/v1/knowledge/{record_id}", headers=two).status_code == 404
     assert client.delete(f"/v1/knowledge/{record_id}", headers=one).status_code == 204
     assert client.get("/v1/knowledge", headers=one).json() == {"items": []}
+
+
+def test_plan_endpoint_returns_explainable_dry_run(client):
+    response = client.post(
+        "/v1/plan",
+        headers={"Authorization": "Bearer test-server-token"},
+        json={"instruction": "Research sources and build an Android app"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["departments"] == ["research", "coding"]
+    assert payload["routing_reasons"] == [
+        {"department": "research", "matched_keywords": ["research", "source"]},
+        {"department": "coding", "matched_keywords": ["app"]},
+    ]
+    assert payload["status"] == "planned"
+    assert payload["execution_started"] is False
+
+
+def test_plan_endpoint_requires_authentication(client):
+    response = client.post("/v1/plan", json={"instruction": "Build an app"})
+    assert response.status_code == 401

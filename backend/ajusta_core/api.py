@@ -9,6 +9,7 @@ from .contracts import TaskRequest
 from .service import TaskExecutionService
 from .skill_store import SQLiteSkillStore, SkillStatus
 from .knowledge_store import SQLiteKnowledgeStore
+from .orchestrator import build_execution_plan
 
 
 class TaskSubmission(BaseModel):
@@ -17,6 +18,11 @@ class TaskSubmission(BaseModel):
     instruction: str = Field(min_length=1, max_length=4000)
     constraints: list[str] = Field(default_factory=list, max_length=20)
     output_format: str = Field(default="text", min_length=1, max_length=40)
+
+
+class PlanSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    instruction: str = Field(min_length=1, max_length=4000)
 
 
 class KnowledgeSubmission(BaseModel):
@@ -169,6 +175,32 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
     @app.get("/v1/health")
     def health(user=Depends(identity)):
         return {"status": "ok", "service": "ajusta"}
+
+    @app.post("/v1/plan")
+    def preview_plan(body: PlanSubmission, user=Depends(identity)):
+        """Return an explainable dry-run plan; this endpoint never executes it."""
+        try:
+            plan = build_execution_plan(
+                body.instruction,
+                enabled_departments=service.enabled_departments,
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        reasons = dict(plan.routing_reasons)
+        return {
+            "objective": plan.objective,
+            "departments": list(plan.departments),
+            "disabled_departments": list(plan.disabled_departments),
+            "routing_reasons": [
+                {"department": name, "matched_keywords": list(reasons.get(name, ()))}
+                for name in plan.departments
+            ],
+            "confidence": plan.confidence,
+            "used_fallback": plan.used_fallback,
+            "steps": list(plan.steps),
+            "status": plan.status,
+            "execution_started": False,
+        }
 
     @app.post("/v1/tasks", response_model=TaskResponse, status_code=201)
     def submit_task(body: TaskSubmission, user=Depends(identity)):

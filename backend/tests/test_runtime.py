@@ -107,3 +107,44 @@ def test_runtime_knowledge_skill_does_not_leak_between_users(tmp_path):
     )
     assert response.status_code == 200
     assert response.json()["output"]["items"] == []
+
+
+class FakeSearchProvider:
+    def search(self, query, *, max_results=5):
+        from ajusta_core.research import ResearchSource
+        return (ResearchSource(
+            title="AJUSTA research source",
+            url="https://example.org/research",
+            content=f"Verified excerpt for {query}",
+            score=0.9,
+        ),)
+
+
+def test_runtime_exposes_research_search_only_when_provider_is_configured(tmp_path):
+    from fastapi.testclient import TestClient
+
+    app = create_runtime_app(
+        database_path=tmp_path / "tasks.sqlite3",
+        auth_database_path=tmp_path / "auth.sqlite3",
+        gateway=FakeGateway(),
+        search_provider=FakeSearchProvider(),
+    )
+    client = TestClient(app)
+    client.post("/v1/auth/register", json={
+        "email": "research@example.com", "password": "a-very-long-password"
+    })
+    login = client.post("/v1/auth/login", json={
+        "email": "research@example.com", "password": "a-very-long-password"
+    }).json()
+    headers = {"Authorization": "Bearer " + login["access_token"]}
+
+    result = client.post(
+        "/v1/skills/research_search/1.0.0/execute",
+        headers=headers,
+        json={"inputs": {"query": "safe AI orchestration"}},
+    )
+    assert result.status_code == 200
+    source = result.json()["output"]["sources"][0]
+    assert source["title"] == "AJUSTA research source"
+    assert source["url"] == "https://example.org/research"
+    assert "safe AI orchestration" in source["content"]

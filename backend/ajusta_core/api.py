@@ -1,5 +1,6 @@
 """AJUSTA HTTP API: user sessions for mobile clients plus legacy private token mode."""
 import secrets
+from contextlib import asynccontextmanager
 from collections.abc import Callable
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -92,12 +93,19 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
     if (task_queue is None) != (task_worker is None):
         raise ValueError("task_queue and task_worker must be configured together")
 
-    app = FastAPI(title="AJUSTA API", version="0.2.0")
+    @asynccontextmanager
+    async def lifespan(app):
+        if task_worker is not None:
+            task_worker.start()
+        try:
+            yield
+        finally:
+            if task_worker is not None:
+                task_worker.stop()
+
+    app = FastAPI(title="AJUSTA API", version="0.2.0", lifespan=lifespan)
     bearer = HTTPBearer(auto_error=False)
     expected_token = api_token.strip() if isinstance(api_token, str) else None
-    if task_worker is not None:
-        app.add_event_handler("startup", task_worker.start)
-        app.add_event_handler("shutdown", task_worker.stop)
 
     def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
         if credentials is None or credentials.scheme.casefold() != "bearer":

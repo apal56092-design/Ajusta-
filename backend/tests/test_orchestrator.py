@@ -23,7 +23,7 @@ def test_central_orchestrator_reports_unavailable_specialists():
     )
 
     assert plan.departments == ("design",)
-    assert plan.disabled_departments == ("data", "coding")
+    assert plan.disabled_departments == ("coding", "data")
 
 
 def test_central_orchestrator_rejects_empty_enabled_registry():

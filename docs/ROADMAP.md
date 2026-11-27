@@ -27,9 +27,10 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Research department with evidence provenance
 - [ ] Coding department with sandbox and test execution
 - [ ] Design, data, business, writing and productivity departments
-- [ ] Skill authoring specification and versioning
-- [ ] Isolated skill execution, review, approval and rollback
-- [ ] Skill evaluation benchmarks and regression tests
+- [x] Declarative skill manifest and in-memory lifecycle registry (draft/review/activate/disable)
+- [ ] Persistent skill catalog with audit history
+- [ ] Isolated skill execution, dependency controls and resource limits
+- [ ] Skill authoring workflow, evaluation benchmarks and rollback
 
 ## E. Knowledge, memory and storage
 - [ ] Storage adapter abstraction
@@ -75,4 +76,4 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-The repository has an initial deterministic Python planner/orchestrator and approval-policy foundation, plus a CI workflow definition. The remaining items above are planned unless their implementation and test evidence are recorded. Check actual CI results before marking tests successful.
+The repository has an initial deterministic Python planner/orchestrator, approval-policy foundation, CI workflow definition and an in-memory declarative skill registry with a reviewed lifecycle. The registry does not execute code and is not a sandbox. All other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.

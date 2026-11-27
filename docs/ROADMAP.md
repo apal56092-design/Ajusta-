@@ -28,7 +28,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] User-visible disclosure of external processing and consent
 
 ## D. Skills and departments
-- [ ] Research department with evidence provenance
+- [x] Six default model-backed text departments registered in the Brain (no external tools)\n- [ ] Research department with evidence provenance
 - [ ] Coding department with sandbox and test execution
 - [ ] Design, data, business, writing and productivity departments
 - [ ] Persistent skill catalog with audit history
@@ -78,7 +78,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. This is not a production-ready application. A concrete OpenAI Responses adapter and model-backed department-handler bridge now exist, but live provider credentials are not configured. Specialist department workflows, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
+Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. This is not a production-ready application. A concrete OpenAI Responses adapter, server-environment gateway factory, and six model-backed text departments now exist, but live provider credentials are not configured. Specialist department workflows, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
 
 ## J. End-to-end capability targets
 - [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests\n- [ ] Live provider integration test with deployment-managed credentials

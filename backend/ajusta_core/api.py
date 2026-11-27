@@ -12,6 +12,8 @@ from .skill_store import SQLiteSkillStore, SkillStatus
 from .knowledge_store import SQLiteKnowledgeStore
 from .orchestrator import build_execution_plan
 from .skill_execution import SkillExecutionEngine
+from .durable_queue import SQLiteTaskQueue
+from .worker import DurableTaskWorker
 
 
 class TaskSubmission(BaseModel):
@@ -65,7 +67,9 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
                skill_store: SQLiteSkillStore | None = None,
                knowledge_store: SQLiteKnowledgeStore | None = None,
                skill_engine: SkillExecutionEngine | None = None,
-               skill_permission_resolver: Callable[[str, tuple[str, ...]], set[str] | frozenset[str]] | None = None) -> FastAPI:
+               skill_permission_resolver: Callable[[str, tuple[str, ...]], set[str] | frozenset[str]] | None = None,
+               task_queue: SQLiteTaskQueue | None = None,
+               task_worker: DurableTaskWorker | None = None) -> FastAPI:
     """Create app in user-session mode or restricted legacy service-token mode."""
     if not isinstance(service, TaskExecutionService):
         raise TypeError("service must be a TaskExecutionService")
@@ -81,10 +85,19 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         raise TypeError("skill_engine must be a SkillExecutionEngine")
     if skill_permission_resolver is not None and not callable(skill_permission_resolver):
         raise TypeError("skill_permission_resolver must be callable")
+    if task_queue is not None and not isinstance(task_queue, SQLiteTaskQueue):
+        raise TypeError("task_queue must be an SQLiteTaskQueue")
+    if task_worker is not None and not isinstance(task_worker, DurableTaskWorker):
+        raise TypeError("task_worker must be a DurableTaskWorker")
+    if (task_queue is None) != (task_worker is None):
+        raise ValueError("task_queue and task_worker must be configured together")
 
     app = FastAPI(title="AJUSTA API", version="0.2.0")
     bearer = HTTPBearer(auto_error=False)
     expected_token = api_token.strip() if isinstance(api_token, str) else None
+    if task_worker is not None:
+        app.add_event_handler("startup", task_worker.start)
+        app.add_event_handler("shutdown", task_worker.stop)
 
     def identity(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)):
         if credentials is None or credentials.scheme.casefold() != "bearer":
@@ -308,6 +321,53 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
                 raise HTTPException(status_code=409, detail="Task ID already exists.") from None
             raise HTTPException(status_code=422, detail="Invalid task submission.") from None
         return _result_payload(result)
+
+
+    @app.post("/v1/tasks/async", status_code=202)
+    def submit_async_task(body: TaskSubmission, user=Depends(identity)):
+        """Durably enqueue work for the explicitly managed trusted worker."""
+        require_user_session(user)
+        if task_queue is None:
+            raise HTTPException(status_code=503, detail="Background task execution is not configured.")
+        try:
+            request = TaskRequest(instruction=body.instruction, constraints=tuple(body.constraints),
+                                  output_format=body.output_format)
+            task_queue.enqueue(body.task_id, user.user_id, {
+                "instruction": request.instruction,
+                "constraints": list(request.constraints),
+                "output_format": request.output_format,
+            })
+        except (TypeError, ValueError) as exc:
+            if "already exists" in str(exc):
+                raise HTTPException(status_code=409, detail="Task ID already exists.") from None
+            raise HTTPException(status_code=422, detail="Invalid task submission.") from None
+        return {"task_id": body.task_id, "status": "queued"}
+
+    @app.get("/v1/tasks/async/{task_id}")
+    def get_async_task(task_id: str, user=Depends(identity)):
+        require_user_session(user)
+        if task_queue is None:
+            raise HTTPException(status_code=503, detail="Background task execution is not configured.")
+        item = task_queue.get(task_id, user.user_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Task not found.")
+        stored = service.get_task(task_id, user_id=user.user_id)
+        if stored is not None and stored.status.value in {"succeeded", "failed", "needs_approval"}:
+            return _result_payload(stored)
+        return {"task_id": task_id, "status": item.status, "result": None,
+                "evidence": [], "error_code": None, "error_message": None}
+
+    @app.delete("/v1/tasks/async/{task_id}", status_code=200)
+    def cancel_async_task(task_id: str, user=Depends(identity)):
+        require_user_session(user)
+        if task_queue is None:
+            raise HTTPException(status_code=503, detail="Background task execution is not configured.")
+        if not task_queue.cancel(task_id, user.user_id):
+            item = task_queue.get(task_id, user.user_id)
+            if item is None:
+                raise HTTPException(status_code=404, detail="Task not found.")
+            raise HTTPException(status_code=409, detail="Only queued tasks can be cancelled.")
+        return {"task_id": task_id, "status": "cancelled"}
 
     @app.get("/v1/tasks/{task_id}", response_model=TaskResponse)
     def get_task(task_id: str, user=Depends(identity)):

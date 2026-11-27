@@ -1,45 +1,53 @@
 # AJUSTA — Architecture Overview
 
 ## Status
-This document describes the proposed architecture. It is not evidence that the components have already been implemented.
+This document describes the target architecture. Only components explicitly identified in the repository's current-status documentation should be treated as implemented.
 
 ## System boundaries
-
 - **Android client (Kotlin):** user-facing interface; sends authenticated requests to the backend.
 - **Backend API (Python):** validates requests, authenticates users and exposes application services.
-- **Central Intelligence:** turns a request into a structured task plan and coordinates approved departments.
-- **Departments:** implement specialist capabilities behind stable interfaces.
-- **Connectors:** isolate external AI providers and tools behind adapters.
-- **Knowledge layer:** retrieves authorized project documents and context.
-- **Security layer:** enforces identity, permissions, secret handling and audit requirements.
+- **Central Intelligence:** interprets goals, plans dependencies, routes work, merges results and checks completion.
+- **Skill registry and runner:** discovers versioned skills and executes approved skills in isolated, permission-scoped environments.
+- **Departments:** specialist capabilities behind stable typed interfaces.
+- **Model and tool connectors:** provider-neutral adapters for external AI models, APIs and approved tools.
+- **Knowledge and storage layer:** manages authorized documents, records, indexes, project context and task history.
+- **Security and governance:** identity, authorization, secret management, policy, audit, privacy and approvals.
+- **Evaluation and improvement loop:** identifies gaps, researches options, tests proposals, requests review and supports rollback.
 
-## Initial request contract
+## Request lifecycle
+1. Authenticate and validate the request.
+2. Identify goal, constraints, data sensitivity and required permissions.
+3. Build a bounded plan with explicit steps and dependencies.
+4. Select available skills, models and departments based on capability, privacy, quality, latency and cost.
+5. Execute only authorized tasks in isolated environments with timeouts and quotas.
+6. Validate results using evidence, deterministic checks or tests.
+7. Merge results and report partial failures and uncertainty.
+8. Ask for approval before consequential external actions.
+9. Record minimal, auditable task metadata and apply retention rules.
 
-A request should eventually include:
-- request identifier
-- user identity and authorization context
-- user instruction
-- optional constraints and attachments
-- requested output format
+## Contracts
+A request should include an identifier, authenticated user context, instruction, constraints, attachments and output format. A task result should include task identifier, status, result, evidence/validation summary, resource usage and structured error information.
 
-A task result should include:
-- task identifier
-- status (queued, running, succeeded, failed, needs_approval)
-- concise result
-- evidence or validation summary where applicable
-- structured error information when unsuccessful
+Departments and skills should declare:
+- stable name and version
+- purpose and supported task types
+- typed input and output schemas
+- dependencies and supported runtime
+- required permission scopes
+- timeout and resource limits
+- tests, evaluation score and provenance
 
-## Orchestration principles
+## Skill learning and activation
+A proposed skill moves through draft, isolated test, review, approved, active, deprecated or rolled-back states. Downloaded code and retrieved instructions are untrusted. Skills cannot self-grant permissions, bypass policy, access unrelated user data or deploy their own updates.
 
-1. Validate the request before planning.
-2. Build a bounded plan with explicit steps and dependencies.
-3. Route only to enabled and authorized departments.
-4. Apply timeouts and resource limits to external calls.
-5. Treat model output and retrieved documents as untrusted input.
-6. Validate outputs before presenting them as verified.
-7. Ask for approval before consequential external actions.
-8. Preserve an auditable record without logging secrets.
+## Storage architecture
+Use replaceable adapters for relational data, object/file storage, search indexes and vector retrieval. Keep data classes separated, encrypt data, enforce tenant and object-level authorization, and implement backup/restore, retention, export and deletion. Storage scaling may use configured local or cloud services, with user consent for external providers and costs.
+
+## Security principles
+Use least privilege, server-side authorization, secret management, maintained cryptography, sandboxing, prompt-injection defenses, quotas, audit logs and explicit approval for consequential actions. Fail closed when permission checks fail. Security is assessed through controls, tests, audits and residual-risk reporting; never claim absolute or 100% security.
+
+## Research-first behavior
+When a request exceeds current capabilities, AJUSTA should state the limitation, investigate evidence-backed alternatives and propose safe experiments. It must not claim success without verification.
 
 ## First implementation milestone
-
-Build a deterministic, provider-independent task planner before connecting paid or external AI services. This creates a testable foundation and avoids pretending that an AI provider is already connected.
+Keep the initial deterministic, provider-independent planner as the foundation. Add typed department contracts and orchestration tests before connecting external providers or executing tools.

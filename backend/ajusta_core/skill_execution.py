@@ -7,6 +7,7 @@ must be trusted application callables registered by the host application.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -58,10 +59,15 @@ class SQLiteSkillAuditStore:
                 ON skill_execution_audit(user_id, created_at DESC)
             """)
 
+    @contextmanager
     def _connect(self):
         db = sqlite3.connect(self.database_path, timeout=10)
         db.row_factory = sqlite3.Row
-        return db
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
 
     def record(self, *, execution_id: str, user_id: str, skill_name: str,
                skill_version: str, status: str, output: Any = None,
@@ -72,13 +78,12 @@ class SQLiteSkillAuditStore:
                                  ensure_ascii=False).encode("utf-8")
             digest = hashlib.sha256(encoded).hexdigest()
         with self._connect() as db:
-            with db:
-                db.execute("""
-                    INSERT INTO skill_execution_audit
-                    (execution_id,user_id,skill_name,skill_version,status,output_sha256,error_code,created_at)
-                    VALUES (?,?,?,?,?,?,?,?)
-                """, (execution_id, user_id, skill_name, skill_version, status,
-                      digest, error_code, datetime.now(timezone.utc).isoformat()))
+            db.execute("""
+                INSERT INTO skill_execution_audit
+                (execution_id,user_id,skill_name,skill_version,status,output_sha256,error_code,created_at)
+                VALUES (?,?,?,?,?,?,?,?)
+            """, (execution_id, user_id, skill_name, skill_version, status,
+                  digest, error_code, datetime.now(timezone.utc).isoformat()))
 
 
 class SkillExecutionEngine:

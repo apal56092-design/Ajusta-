@@ -15,6 +15,7 @@ from .skills import (
     validate_manifest,
 )
 from .storage import SQLiteTaskStore, StoredTask
+from .skill_store import SQLiteSkillStore
 from .service import TaskExecutionService
 from .api import create_app
 from .research import ResearchDepartmentHandler, ResearchSource, TavilySearchProvider
@@ -30,5 +31,5 @@ __all__ = [
     "ModelAuthenticationError", "ModelRequestError", "OpenAIResponsesProvider", "AnthropicMessagesProvider", "XAIResponsesProvider", "DeepSeekResponsesProvider", "create_default_model_gateway", "create_configured_model_gateway",
     "Action", "ApprovalRequired", "authorize_action",
     "RegisteredSkill", "SkillManifest", "SkillRegistry", "SkillStatus",
-    "SkillValidationError", "validate_manifest", "SQLiteTaskStore", "StoredTask", "TaskExecutionService", "create_app",
+    "SkillValidationError", "validate_manifest", "SQLiteSkillStore", "SQLiteTaskStore", "StoredTask", "TaskExecutionService", "create_app",
 ]

@@ -99,7 +99,7 @@ class SQLiteTaskStore:
                 rows = connection.execute(
                     """SELECT task_id,instruction,status,result,evidence_json,error_code,
                        error_message,user_id FROM tasks WHERE user_id IS NULL
-                       ORDER BY created_at DESC, task_id DESC LIMIT ?""",
+                       ORDER BY rowid DESC LIMIT ?""",
                     (limit,),
                 ).fetchall()
             else:

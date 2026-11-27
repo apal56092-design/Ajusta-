@@ -27,6 +27,20 @@ class AjustaApiClient {
         request("POST", "/v1/tasks", token = token, body = JSONObject()
             .put("task_id", taskId).put("instruction", instruction))
 
+    fun submitAsyncTask(token: String, taskId: String, instruction: String): ApiResult =
+        request("POST", "/v1/tasks/async", token = token, body = JSONObject()
+            .put("task_id", taskId).put("instruction", instruction))
+
+    fun getAsyncTask(token: String, taskId: String): ApiResult {
+        require(taskId.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "Invalid task ID." }
+        return request("GET", "/v1/tasks/async/$taskId", token = token)
+    }
+
+    fun cancelAsyncTask(token: String, taskId: String): ApiResult {
+        require(taskId.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "Invalid task ID." }
+        return request("DELETE", "/v1/tasks/async/$taskId", token = token)
+    }
+
     fun listTasks(token: String, limit: Int = 50): ApiResult {
         require(limit in 1..100) { "Task history limit must be between 1 and 100." }
         return request("GET", "/v1/tasks?limit=$limit", token = token)

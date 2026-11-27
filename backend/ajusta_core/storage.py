@@ -1,9 +1,10 @@
 """Small durable SQLite task store; suitable for local development and tests."""
+from contextlib import contextmanager
 from dataclasses import dataclass
 import json
 from pathlib import Path
 import sqlite3
-from typing import Any
+from typing import Iterator
 
 from .contracts import TaskRequest, TaskResult, TaskStatus
 
@@ -20,27 +21,33 @@ class StoredTask:
 
 
 class SQLiteTaskStore:
-    """Persist task requests and outcomes in a SQLite database file.
+    """Persist task requests and outcomes in a file-backed SQLite database.
 
-    Each operation opens its own connection, so separate store instances can safely
-    access the same database. Parent directories are created automatically.
+    Each operation opens and closes its own connection, allowing separate store
+    instances to access the same database without sharing connection state.
     """
 
     def __init__(self, database_path: str | Path) -> None:
         self.database_path = str(database_path)
-        if self.database_path != ":memory:":
-            Path(self.database_path).expanduser().resolve().parent.mkdir(
-                parents=True, exist_ok=True
-            )
+        if self.database_path == ":memory:":
+            raise ValueError("a file-backed database is required for durable storage")
+        Path(self.database_path).expanduser().resolve().parent.mkdir(
+            parents=True, exist_ok=True
+        )
         self._initialize()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.database_path, timeout=10)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS tasks (
@@ -63,7 +70,7 @@ class SQLiteTaskStore:
         if not isinstance(request, TaskRequest):
             raise TypeError("request must be a TaskRequest")
         try:
-            with self._connect() as connection:
+            with self._connection() as connection:
                 connection.execute(
                     """
                     INSERT INTO tasks (task_id, instruction, status)
@@ -77,7 +84,7 @@ class SQLiteTaskStore:
     def save_result(self, result: TaskResult) -> None:
         if not isinstance(result, TaskResult):
             raise TypeError("result must be a TaskResult")
-        with self._connect() as connection:
+        with self._connection() as connection:
             cursor = connection.execute(
                 """
                 UPDATE tasks
@@ -98,7 +105,7 @@ class SQLiteTaskStore:
                 raise KeyError(f"task {result.task_id!r} does not exist")
 
     def get_task(self, task_id: str) -> StoredTask | None:
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 """
                 SELECT task_id, instruction, status, result, evidence_json,
@@ -109,7 +116,7 @@ class SQLiteTaskStore:
             ).fetchone()
         if row is None:
             return None
-        evidence: Any = json.loads(row["evidence_json"])
+        evidence = json.loads(row["evidence_json"])
         if not isinstance(evidence, list) or any(
             not isinstance(item, str) for item in evidence
         ):

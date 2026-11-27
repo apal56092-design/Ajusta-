@@ -15,7 +15,10 @@ From this directory: `python -m pytest`
 - Central orchestrator combines the planner, enabled-department registry and action policy.
 - Reports requested departments that are not enabled instead of pretending they are connected.
 - Blocks consequential actions unless explicit user approval is present.
-- Unit tests specify planner, policy and orchestration behavior.
+- Declarative skill manifests with name/version/schema/permission validation.
+- In-memory skill registry with draft → approved → active lifecycle and explicit disable/re-review.
+- Skill registration stores metadata only; it does not execute downloaded or generated code.
+- Unit tests specify planner, policy, orchestration and skill-registry behavior.
 
 ## Not connected yet
-No AI provider is connected; no department performs real specialist work; no external tools are invoked; there is no database, authentication service, Android client, long-term memory, autonomous learning, or production deployment. The central orchestration layer currently creates plans only. Add integrations behind documented interfaces, permission checks and tests.
+No AI provider is connected; no department performs real specialist work; no external tools are invoked; no persistent database, authentication service, Android client, long-term memory, sandboxed skill runner, autonomous learning pipeline, or production deployment exists. The skill registry is currently in-memory and is not a security sandbox. The central orchestration layer creates plans only. Add integrations behind documented interfaces, permission checks and tests.

@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
@@ -51,6 +52,30 @@ class MainActivity : ComponentActivity() {
 
 private data class ChatMessage(val text: String, val fromUser: Boolean)
 
+private data class TaskHistoryItem(
+    val taskId: String,
+    val instruction: String,
+    val status: String,
+    val result: String?,
+    val errorMessage: String?
+)
+
+private fun parseTaskHistory(payload: org.json.JSONObject): List<TaskHistoryItem> {
+    val items = payload.optJSONArray("items") ?: return emptyList()
+    return buildList {
+        for (index in 0 until items.length()) {
+            val item = items.optJSONObject(index) ?: continue
+            add(TaskHistoryItem(
+                taskId = item.optString("task_id"),
+                instruction = item.optString("instruction", "AJUSTA task"),
+                status = item.optString("status", "unknown"),
+                result = item.optString("result").takeIf { it.isNotBlank() && it != "null" },
+                errorMessage = item.optString("error_message").takeIf { it.isNotBlank() && it != "null" }
+            ))
+        }
+    }
+}
+
 @Composable
 private fun AjustaHome() {
     val context = LocalContext.current
@@ -58,6 +83,7 @@ private fun AjustaHome() {
     val api = remember { AjustaApiClient() }
     val scope = rememberCoroutineScope()
     val messages = remember { mutableStateListOf<ChatMessage>() }
+    var taskHistory by remember { mutableStateOf<List<TaskHistoryItem>>(emptyList()) }
     var token by remember { mutableStateOf<String?>(null) }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -77,6 +103,32 @@ private fun AjustaHome() {
                 } else sessionStore.clear()
             } catch (_: Exception) {
                 status = "Saved session could not be verified. Check API address and connection."
+            }
+        }
+    }
+
+    LaunchedEffect(token) {
+        val activeToken = token ?: return@LaunchedEffect
+        try {
+            val response = withContext(Dispatchers.IO) { api.listTasks(activeToken) }
+            if (response.statusCode == 200) taskHistory = parseTaskHistory(response.payload)
+            else status = "Task history unavailable (" + response.statusCode + ")."
+        } catch (error: Exception) {
+            status = "Task history connection failed: " + (error.message ?: "unknown error")
+        }
+    }
+
+    fun refreshTaskHistory(activeToken: String) {
+        scope.launch {
+            try {
+                val response = withContext(Dispatchers.IO) { api.listTasks(activeToken) }
+                if (response.statusCode == 200) {
+                    taskHistory = parseTaskHistory(response.payload)
+                } else {
+                    status = "Task history unavailable (" + response.statusCode + ")."
+                }
+            } catch (error: Exception) {
+                status = "Could not refresh history: " + (error.message ?: "unknown error")
             }
         }
     }
@@ -145,12 +197,17 @@ private fun AjustaHome() {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(enabled = !busy, onClick = {
                     val activeToken = token ?: return@Button
+                    refreshTaskHistory(activeToken)
+                }) { Text("Refresh history") }
+                Button(enabled = !busy, onClick = {
+                    val activeToken = token ?: return@Button
                     busy = true
                     scope.launch {
                         try { withContext(Dispatchers.IO) { api.logout(activeToken) } }
                         catch (_: Exception) { /* Always clear local credentials. */ }
                         sessionStore.clear()
                         token = null
+                        taskHistory = emptyList()
                         status = "Signed out."
                         busy = false
                     }
@@ -161,6 +218,22 @@ private fun AjustaHome() {
                 contentPadding = PaddingValues(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item { Text("Recent task history", style = MaterialTheme.typography.titleMedium) }
+                items(taskHistory, key = { it.taskId }) { task ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(task.instruction, style = MaterialTheme.typography.titleSmall)
+                            Text("Status: " + task.status, style = MaterialTheme.typography.labelMedium)
+                            task.result?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            task.errorMessage?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            Text("Task ID: " + task.taskId, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
                 items(messages) { message ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -187,23 +260,50 @@ private fun AjustaHome() {
                 busy = true
                 status = "Task AJUSTA Brain ko bheja ja raha hai..."
                 scope.launch {
+                    val progressWatcher = launch {
+                        repeat(45) {
+                            delay(700)
+                            try {
+                                val live = withContext(Dispatchers.IO) { api.getTask(activeToken, taskId) }
+                                if (live.statusCode == 200) {
+                                    val liveStatus = live.payload.optString("status", "running")
+                                    status = "AJUSTA task status: " + liveStatus
+                                    if (liveStatus in setOf("succeeded", "failed", "needs_approval", "cancelled")) {
+                                        return@launch
+                                    }
+                                }
+                            } catch (_: Exception) {
+                                // The submit request remains authoritative if polling is temporarily unavailable.
+                            }
+                        }
+                    }
                     try {
                         val response = withContext(Dispatchers.IO) {
                             api.submitTask(activeToken, taskId, instruction)
                         }
+                        progressWatcher.cancel()
                         if (response.statusCode in 200..299) {
+                            val finalStatus = response.payload.optString("status", "completed")
                             messages.add(ChatMessage(
-                                response.payload.optString("result", response.payload.optString("status")),
+                                response.payload.optString("result",
+                                    response.payload.optString("error_message", finalStatus)),
                                 false
                             ))
-                            status = "Task complete: " + response.payload.optString("status")
+                            status = "Task finished: " + finalStatus
                         } else {
                             status = "Task request failed (" + response.statusCode + "): " +
                                 response.payload.optString("detail", "API error")
                         }
+                        val historyResponse = withContext(Dispatchers.IO) { api.listTasks(activeToken) }
+                        if (historyResponse.statusCode == 200) {
+                            taskHistory = parseTaskHistory(historyResponse.payload)
+                        }
                     } catch (error: Exception) {
                         status = "Task connection failed: " + (error.message ?: "unknown error")
-                    } finally { busy = false }
+                    } finally {
+                        progressWatcher.cancel()
+                        busy = false
+                    }
                 }
             }) { Text(if (busy) "Working..." else "Send task") }
         }

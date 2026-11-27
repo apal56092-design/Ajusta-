@@ -7,7 +7,7 @@ AJUSTA is an ambitious, modular AI ecosystem designed as a Jarvis-inspired opera
 
 Its goal is to help people move from an objective to a well-researched, verified and useful result: understand the request, plan the work, select appropriate capabilities, coordinate execution, evaluate the outcome and explain what was completed.
 
-**Important project-status statement:** The repository now includes an initial Python backend foundation: deterministic request planning, a central orchestration boundary, department-availability reporting, a consequential-action approval gate, unit tests, and a GitHub Actions test workflow. These components create plans only; they do not yet connect real AI providers, execute specialist work, or provide a production app. Other features remain planned until implemented and verified.
+**Important project-status statement:** The repository now includes an initial Python backend foundation: deterministic request planning, typed task request/result contracts, a central orchestration boundary, department-availability reporting, a consequential-action approval gate, a declarative in-memory skill registry with reviewed lifecycle states, unit-test specifications, and a GitHub Actions test workflow. These components create plans only; they do not yet connect real AI providers, execute specialist work, or provide a production app. Other features remain planned until implemented and verified.
 
 ---
 
@@ -198,7 +198,7 @@ The target design—including Jarvis-style orchestration, broad skill discovery,
 
 **Current stage: Backend orchestration foundation.**
 
-The repository contains a deterministic planner, a central orchestration API, a policy approval gate, unit-test specifications, and a CI workflow intended to run the backend tests. This is not yet a connected multi-model AI system: specialist departments, provider adapters, knowledge storage, authentication, and the Kotlin Android client still require implementation. Test status must be confirmed from an actual CI run before calling the tests passing.
+The repository contains a deterministic planner, a central orchestration API, a policy approval gate, unit-test specifications, and a CI workflow intended to run the backend tests. This is not yet a connected multi-model AI system: real specialist execution, AI provider adapters, persistent skill storage, sandboxed skill execution, knowledge storage, authentication, and the Kotlin Android client still require implementation. Test status must be confirmed from an actual CI run before calling the tests passing.
 
 ---
 

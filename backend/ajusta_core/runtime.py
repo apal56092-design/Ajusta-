@@ -58,7 +58,8 @@ def create_runtime_app(
         registry=registry,
         enabled_departments=departments,
     )
-    app = create_app(service, auth_store=auth_store, skill_store=skill_store,\n                     knowledge_store=knowledge_store)
+    app = create_app(service, auth_store=auth_store, skill_store=skill_store,
+                     knowledge_store=knowledge_store)
     app.state.task_service = service
     app.state.auth_store = auth_store
     app.state.department_registry = registry

@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .auth import AuthenticationError, AuthenticatedUser, SQLiteAuthStore
 from .contracts import TaskRequest
 from .service import TaskExecutionService
+from .skill_store import SQLiteSkillStore, SkillStatus
 
 
 class TaskSubmission(BaseModel):
@@ -39,7 +40,8 @@ def _result_payload(result):
 
 
 def create_app(service: TaskExecutionService, *, api_token: str | None = None,
-               auth_store: SQLiteAuthStore | None = None) -> FastAPI:
+               auth_store: SQLiteAuthStore | None = None,
+               skill_store: SQLiteSkillStore | None = None) -> FastAPI:
     """Create app in user-session mode or restricted legacy service-token mode."""
     if not isinstance(service, TaskExecutionService):
         raise TypeError("service must be a TaskExecutionService")
@@ -47,6 +49,8 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         raise ValueError("provide an auth_store or non-empty server-side API token")
     if auth_store is not None and not isinstance(auth_store, SQLiteAuthStore):
         raise TypeError("auth_store must be a SQLiteAuthStore")
+    if skill_store is not None and not isinstance(skill_store, SQLiteSkillStore):
+        raise TypeError("skill_store must be a SQLiteSkillStore")
 
     app = FastAPI(title="AJUSTA API", version="0.2.0")
     bearer = HTTPBearer(auto_error=False)
@@ -103,6 +107,18 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         if user is None:
             raise HTTPException(status_code=404, detail="User sessions are not enabled.")
         return {"user_id": user.user_id, "email": user.email}
+
+    @app.get("/v1/skills")
+    def list_active_skills(user=Depends(identity)):
+        if skill_store is None:
+            return {"skills": []}
+        active = skill_store.list_skills(status=SkillStatus.ACTIVE)
+        return {"skills": [
+            {"name": item.name, "version": item.version,
+             "description": item.manifest.description,
+             "permissions": list(item.permissions)}
+            for item in active
+        ]}
 
     @app.get("/v1/health")
     def health(user=Depends(identity)):

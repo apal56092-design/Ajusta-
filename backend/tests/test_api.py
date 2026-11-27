@@ -208,3 +208,32 @@ def test_plan_endpoint_returns_explainable_dry_run(client):
 def test_plan_endpoint_requires_authentication(client):
     response = client.post("/v1/plan", json={"instruction": "Build an app"})
     assert response.status_code == 401
+
+
+def test_knowledge_search_api_is_authenticated_and_user_scoped(tmp_path):
+    from ajusta_core.auth import SQLiteAuthStore
+    from ajusta_core.knowledge_store import SQLiteKnowledgeStore
+
+    auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
+    auth.register_user("searcher@example.com", "long-password-one")
+    auth.register_user("other@example.com", "long-password-two")
+    one = auth.create_session(auth.authenticate("searcher@example.com", "long-password-one").user_id)
+    two = auth.create_session(auth.authenticate("other@example.com", "long-password-two").user_id)
+    knowledge = SQLiteKnowledgeStore(tmp_path / "knowledge.sqlite3")
+    knowledge.create(auth.authenticate("searcher@example.com", "long-password-one").user_id,
+                     "Solar energy", "Photovoltaic panels convert sunlight into electricity.")
+    knowledge.create(auth.authenticate("other@example.com", "long-password-two").user_id,
+                     "Solar notes", "Photovoltaic cells are used in solar panels.")
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    service = TaskExecutionService(store=SQLiteTaskStore(tmp_path / "tasks.sqlite3"),
+                                   registry=registry, enabled_departments={"research"})
+    client = TestClient(create_app(service, auth_store=auth, knowledge_store=knowledge))
+
+    assert client.get("/v1/knowledge/search?q=photovoltaic").status_code == 401
+    own = client.get("/v1/knowledge/search?q=photovoltaic",
+                     headers={"Authorization": f"Bearer {one}"})
+    other = client.get("/v1/knowledge/search?q=photovoltaic",
+                       headers={"Authorization": f"Bearer {two}"})
+    assert own.status_code == 200 and len(own.json()["items"]) == 1
+    assert other.status_code == 200 and len(other.json()["items"]) == 1

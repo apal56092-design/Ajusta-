@@ -124,7 +124,7 @@ class SQLiteKnowledgeStore:
             raise ValueError("user_id is required")
         if not isinstance(query, str):
             raise TypeError("query must be a string")
-        terms = re.findall(r"[^\\W_]+", query, flags=re.UNICODE)
+        terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)
         if not terms:
             raise ValueError("query must contain searchable words")
         if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
@@ -134,9 +134,9 @@ class SQLiteKnowledgeStore:
             rows = connection.execute(
                 """
                 SELECT records.*
-                FROM knowledge_fts AS search
-                JOIN knowledge_records AS records ON records.id = search.id
-                WHERE search MATCH ? AND records.user_id = ?
+                FROM knowledge_fts
+                JOIN knowledge_records AS records ON records.id = knowledge_fts.id
+                WHERE knowledge_fts MATCH ? AND records.user_id = ?
                 ORDER BY bm25(knowledge_fts), records.created_at DESC
                 LIMIT ?
                 """,

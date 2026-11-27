@@ -182,6 +182,11 @@ def register_model_departments(
     """
     if not isinstance(registry, DepartmentRegistry):
         raise TypeError("registry must be a DepartmentRegistry")
+    conflicts = tuple(
+        name for name in _DEFAULT_DEPARTMENT_PROMPTS if registry.get(name) is not None
+    )
+    if conflicts:
+        raise ValueError("departments already registered: " + ", ".join(conflicts))
     handlers = tuple(
         ModelDepartmentHandler(
             name=name,
@@ -191,9 +196,6 @@ def register_model_departments(
         )
         for name, system_prompt in _DEFAULT_DEPARTMENT_PROMPTS.items()
     )
-    conflicts = tuple(handler.name for handler in handlers if registry.get(handler.name) is not None)
-    if conflicts:
-        raise ValueError("departments already registered: " + ", ".join(conflicts))
     for handler in handlers:
         registry.register(handler)
     return tuple(handler.name for handler in handlers)

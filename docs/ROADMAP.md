@@ -1,15 +1,16 @@
 # AJUSTA — End-to-End Delivery Roadmap
 
-This roadmap combines the capability vision with product, security, infrastructure and operations requirements. A checkbox is complete only when implementation and verification evidence exist.
+A checkbox is complete only when implementation and verification evidence exist.
 
 ## A. Foundation and central brain
 - [x] Typed task request/result contracts and lifecycle statuses
 - [x] Initial department routing and central orchestration boundary
 - [x] Declarative skill manifest and in-memory registry lifecycle (draft/review/activate/disable)
 - [x] Explicit department-handler interface, allow-listed registry and central plan dispatcher (in-memory; no real specialist integrations yet)
-- [ ] Persistent skill catalog
+- [x] SQLite-backed durable task request/result storage foundation
+- [ ] Persistent skill catalog and database migrations
 - [ ] Dependency-aware planner, bounded concurrency and cancellation
-- [ ] Structured task state, partial failures and idempotency
+- [ ] Structured task state, idempotency and durable execution queue
 - [ ] API versioning and generated API documentation
 
 ## B. Security and identity
@@ -35,8 +36,7 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Skill authoring workflow, evaluation benchmarks and rollback
 
 ## E. Knowledge, memory and storage
-- [ ] Storage adapter abstraction
-- [ ] Relational database and object/file storage
+- [ ] Storage adapter abstraction and object/file storage
 - [ ] Document ingestion, indexing and retrieval
 - [ ] Provenance, source freshness and access filtering
 - [ ] User-visible memory inspection, correction, export and deletion
@@ -78,17 +78,16 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-The repository contains a deterministic Python planner/orchestrator, approval-policy foundation, typed task contracts, a declarative in-memory skill registry, an explicit in-memory department-handler registry/dispatcher and a CI workflow definition. Department dispatch has no real specialist integrations yet. The registry does not execute code and is not a sandbox. Other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.
+Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. This is not a production-ready application. Real AI providers, specialist departments, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
 
-## J. Explicit end-to-end capability delivery
-These requirements expand the existing workstreams; they remain planned until implemented and verified.
-- [ ] Real AI model adapters connected to at least one selected provider, with secure server-side secrets and verified integration tests
-- [ ] Central AI Brain coordinating planning, dependency graphs, model routing, departments, skills, progress, cancellation and result evaluation
-- [ ] Secure Skill Execution Engine with isolated sandbox, permission scopes, resource limits, audit, approval, disable and rollback
-- [ ] Persistent database for identity, tasks, skills, permissions and audit history; durable file/object storage with configurable adapters
-- [ ] Adaptive storage policy based on data sensitivity, configured capacity, provider limits, availability and cost; backups and restore verification
-- [ ] Learning and Research Engine with source provenance, freshness, evidence evaluation and reviewed skill-improvement lifecycle
-- [ ] Complete authentication and server-enforced authorization across users, tenants, departments, skills, connectors and data
-- [ ] Native Kotlin Android app connected to authenticated APIs, with task workspace, approvals, skills, storage and privacy controls
-- [ ] Real execution implementations for every department, each with typed contracts, permissions, evidence and department-specific tests
-- [ ] End-to-end acceptance tests proving a user request can travel from Android/API through brain, model, department/skill, storage and verified result
+## J. End-to-end capability targets
+- [ ] Real AI model adapters with secure server-side secrets and verified integration tests
+- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
+- [ ] Secure Skill Execution Engine with isolation, permissions, resource limits, audit, approval and rollback
+- [ ] Complete persistent database for identity, tasks, skills, permissions and audit history
+- [ ] Adaptive object/file storage with capacity, cost, backup and restore controls
+- [ ] Learning and Research Engine with provenance, freshness and reviewed improvements
+- [ ] Authentication and server-enforced authorization across all data and actions
+- [ ] Native Kotlin Android app connected to authenticated APIs
+- [ ] Real implementations for every department, with evidence and tests
+- [ ] End-to-end acceptance tests from Android/API through brain, model, department/skill, storage and verified result

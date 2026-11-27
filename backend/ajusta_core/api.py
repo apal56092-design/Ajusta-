@@ -1,6 +1,6 @@
 """AJUSTA HTTP API: user sessions for mobile clients plus legacy private token mode."""
 import secrets
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -8,6 +8,7 @@ from .auth import AuthenticationError, AuthenticatedUser, SQLiteAuthStore
 from .contracts import TaskRequest
 from .service import TaskExecutionService
 from .skill_store import SQLiteSkillStore, SkillStatus
+from .knowledge_store import SQLiteKnowledgeStore
 
 
 class TaskSubmission(BaseModel):
@@ -16,6 +17,12 @@ class TaskSubmission(BaseModel):
     instruction: str = Field(min_length=1, max_length=4000)
     constraints: list[str] = Field(default_factory=list, max_length=20)
     output_format: str = Field(default="text", min_length=1, max_length=40)
+
+
+class KnowledgeSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    title: str = Field(min_length=1, max_length=160)
+    content: str = Field(min_length=1, max_length=20000)
 
 
 class Credentials(BaseModel):
@@ -41,7 +48,8 @@ def _result_payload(result):
 
 def create_app(service: TaskExecutionService, *, api_token: str | None = None,
                auth_store: SQLiteAuthStore | None = None,
-               skill_store: SQLiteSkillStore | None = None) -> FastAPI:
+               skill_store: SQLiteSkillStore | None = None,
+               knowledge_store: SQLiteKnowledgeStore | None = None) -> FastAPI:
     """Create app in user-session mode or restricted legacy service-token mode."""
     if not isinstance(service, TaskExecutionService):
         raise TypeError("service must be a TaskExecutionService")
@@ -51,6 +59,8 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         raise TypeError("auth_store must be a SQLiteAuthStore")
     if skill_store is not None and not isinstance(skill_store, SQLiteSkillStore):
         raise TypeError("skill_store must be a SQLiteSkillStore")
+    if knowledge_store is not None and not isinstance(knowledge_store, SQLiteKnowledgeStore):
+        raise TypeError("knowledge_store must be a SQLiteKnowledgeStore")
 
     app = FastAPI(title="AJUSTA API", version="0.2.0")
     bearer = HTTPBearer(auto_error=False)
@@ -119,6 +129,42 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
              "permissions": list(item.permissions)}
             for item in active
         ]}
+
+    def require_user_session(user):
+        if user is None:
+            raise HTTPException(status_code=403, detail="A user session is required.")
+
+    @app.post("/v1/knowledge", status_code=201)
+    def create_knowledge(body: KnowledgeSubmission, user=Depends(identity)):
+        require_user_session(user)
+        if knowledge_store is None:
+            raise HTTPException(status_code=503, detail="Knowledge storage is not configured.")
+        try:
+            item = knowledge_store.create(user.user_id, body.title, body.content)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return {"id": item.id, "title": item.title, "content": item.content,
+                "created_at": item.created_at}
+
+    @app.get("/v1/knowledge")
+    def list_knowledge(user=Depends(identity)):
+        require_user_session(user)
+        if knowledge_store is None:
+            raise HTTPException(status_code=503, detail="Knowledge storage is not configured.")
+        return {"items": [
+            {"id": item.id, "title": item.title, "content": item.content,
+             "created_at": item.created_at}
+            for item in knowledge_store.list_for_user(user.user_id)
+        ]}
+
+    @app.delete("/v1/knowledge/{record_id}", status_code=204)
+    def delete_knowledge(record_id: str, user=Depends(identity)):
+        require_user_session(user)
+        if knowledge_store is None:
+            raise HTTPException(status_code=503, detail="Knowledge storage is not configured.")
+        if not knowledge_store.delete(user.user_id, record_id):
+            raise HTTPException(status_code=404, detail="Knowledge record not found.")
+        return Response(status_code=204)
 
     @app.get("/v1/health")
     def health(user=Depends(identity)):

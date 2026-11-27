@@ -148,3 +148,41 @@ def test_skill_catalog_returns_only_active_skill_metadata(client, tmp_path):
         "name": "research_digest", "version": "1.0.0",
         "description": "Summarize approved sources", "permissions": ["knowledge.read"],
     }]}
+
+
+def test_knowledge_api_requires_user_session(client):
+    response = client.get("/v1/knowledge")
+    assert response.status_code == 401
+
+
+def test_knowledge_records_are_private_to_the_authenticated_user(tmp_path):
+    from ajusta_core.auth import SQLiteAuthStore
+    from ajusta_core.knowledge_store import SQLiteKnowledgeStore
+
+    auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
+    auth.register_user("one@example.com", "long-password-one")
+    auth.register_user("two@example.com", "long-password-two")
+    token_one = auth.create_session(auth.authenticate("one@example.com", "long-password-one").user_id)
+    token_two = auth.create_session(auth.authenticate("two@example.com", "long-password-two").user_id)
+
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    service = TaskExecutionService(
+        store=SQLiteTaskStore(tmp_path / "tasks.sqlite3"),
+        registry=registry, enabled_departments={"research"},
+    )
+    app = create_app(service, auth_store=auth, knowledge_store=SQLiteKnowledgeStore(tmp_path / "knowledge.sqlite3"))
+    client = TestClient(app)
+    one = {"Authorization": f"Bearer {token_one}"}
+    two = {"Authorization": f"Bearer {token_two}"}
+
+    created = client.post("/v1/knowledge", headers=one, json={
+        "title": "Research notes", "content": "Evidence from reviewed sources"
+    })
+    assert created.status_code == 201
+    record_id = created.json()["id"]
+    assert client.get("/v1/knowledge", headers=one).json()["items"][0]["id"] == record_id
+    assert client.get("/v1/knowledge", headers=two).json() == {"items": []}
+    assert client.delete(f"/v1/knowledge/{record_id}", headers=two).status_code == 404
+    assert client.delete(f"/v1/knowledge/{record_id}", headers=one).status_code == 204
+    assert client.get("/v1/knowledge", headers=one).json() == {"items": []}

@@ -15,6 +15,7 @@ from .models import create_configured_model_gateway
 from .research import TavilySearchProvider
 from .service import TaskExecutionService
 from .skill_store import SQLiteSkillStore
+from .knowledge_store import SQLiteKnowledgeStore
 from .storage import SQLiteTaskStore
 
 
@@ -49,6 +50,7 @@ def create_runtime_app(
     }
     store = SQLiteTaskStore(database_path)
     skill_store = SQLiteSkillStore(database_path)
+    knowledge_store = SQLiteKnowledgeStore(database_path)
     auth_path = auth_database_path or database_path
     auth_store = SQLiteAuthStore(auth_path)
     service = TaskExecutionService(
@@ -56,7 +58,8 @@ def create_runtime_app(
         registry=registry,
         enabled_departments=departments,
     )
-    app = create_app(service, auth_store=auth_store, skill_store=skill_store)
+    app = create_app(service, auth_store=auth_store, skill_store=skill_store,
+                     knowledge_store=knowledge_store)
     app.state.task_service = service
     app.state.auth_store = auth_store
     app.state.department_registry = registry

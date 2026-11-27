@@ -19,6 +19,7 @@ class Gateway:
 def setup(tmp_path):
     auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
     auth.register_user("async@example.com", "long-password-123")
+    auth.register_user("other@example.com", "long-password-456")
     user = auth.authenticate("async@example.com", "long-password-123")
     token = auth.create_session(user.user_id)
     registry = DepartmentRegistry()
@@ -67,10 +68,13 @@ def test_async_task_requires_user_session_and_hides_other_owners(tmp_path):
     assert client.post("/v1/tasks/async", json=body).status_code == 401
     headers = {"Authorization": f"Bearer {token}"}
     assert client.post("/v1/tasks/async", headers=headers, json=body).status_code == 202
+    other_token = client.post("/v1/auth/login", json={
+        "email": "other@example.com", "password": "long-password-456",
+    }).json()["access_token"]
     other = client.get("/v1/tasks/async/private-async", headers={
-        "Authorization": f"Bearer {client.post('/v1/auth/login', json={'email':'async@example.com','password':'long-password-123'}).json()['access_token']}"
+        "Authorization": f"Bearer {other_token}",
     })
-    assert other.status_code == 200
+    assert other.status_code == 404
 
 
 def test_async_cancel_only_cancels_queued_tasks(tmp_path):

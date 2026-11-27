@@ -147,7 +147,7 @@ class OpenAIResponsesProvider:
                         and isinstance(part.get("text"), str)
                     ):
                         text_parts.append(part["text"])
-        answer = "\\n".join(part for part in text_parts if part.strip()).strip()
+        answer = "\n".join(part for part in text_parts if part.strip()).strip()
         if not answer:
             raise ValueError("OpenAI response contains no output text")
         return ModelResponse(provider=self.name, model=self.model, text=answer)

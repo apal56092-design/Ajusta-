@@ -49,7 +49,7 @@ def plan_request(request: str, departments=DEFAULT_DEPARTMENTS) -> TaskPlan:
     for dept in departments:
         matches = tuple(
             word for word in dept.keywords
-            if re.search(r"(?<![a-z0-9_])" + re.escape(word) + r"(?![a-z0-9_])", normalized)
+            if re.search(r"(?<![a-z0-9_])" + re.escape(word) + r"s?(?![a-z0-9_])", normalized)
         )
         if matches:
             reasons.append((dept.name, matches))

@@ -211,7 +211,7 @@ class SQLiteTaskQueue:
         now = time.time()
         message = "Task cancelled cooperatively" if cancelled else ("Task completed" if succeeded else "Task failed")
         with self._connect() as db:
-            row = db.execute("""SELECT owner_id,progress_percent FROM task_queue
+            row = db.execute("""SELECT owner_id,progress_percent,cancel_requested_at FROM task_queue
                 WHERE task_id=? AND status='running' AND lease_token=?""", (task_id, lease_token)).fetchone()
             if row is None:
                 return False
@@ -221,7 +221,7 @@ class SQLiteTaskQueue:
                 message = "Task cancelled cooperatively"
             percent = 100 if succeeded and not cancelled else row["progress_percent"]
             cursor = db.execute("""UPDATE task_queue SET status=?, error=?, lease_token=NULL,
-                lease_until=NULL, updated_at=?, progress_percent=?, progress_message=?
+                lease_until=NULL, updated_at=?, progress_percent=?, progress_message=?, cancel_requested_at=NULL
                 WHERE task_id=? AND status='running' AND lease_token=?""",
                 (status, safe_error, now, percent, message, task_id, lease_token))
             if cursor.rowcount == 1:

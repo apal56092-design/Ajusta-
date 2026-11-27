@@ -48,7 +48,8 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] User consent for external storage and paid capacity
 
 ## F. Android and user experience
-- [ ] Kotlin Android app skeleton and secure API client
+- [x] Kotlin Android Jetpack Compose app skeleton and APK build workflow
+- [ ] Secure API client with user-scoped authentication
 - [ ] Unified chat, projects and file attachments
 - [ ] Task plan, progress, cancellation and result screens
 - [ ] Approval inbox and connected-account controls
@@ -94,6 +95,7 @@ Implemented foundations: deterministic planner/orchestrator, approval-policy fou
 - [ ] Learning and Research Engine with provenance, freshness and reviewed improvements
 - [x] Versioned FastAPI task endpoints with shared server-side bearer authentication for controlled use
 - [ ] User-scoped authentication and server-enforced authorization across all data and actions
-- [ ] Native Kotlin Android app connected to authenticated APIs
+- [x] Native Kotlin Android application skeleton (not yet connected to backend)
+- [ ] Complete Android app connected to user-authenticated APIs
 - [ ] Real implementations for every department, with evidence and tests
 - [ ] End-to-end acceptance tests from Android/API through brain, model, department/skill, storage and verified result

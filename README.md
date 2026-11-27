@@ -3,7 +3,7 @@
 
 > **One System. Multiple Intelligences. Expanding Possibilities.**
 
-AJUSTA is an ambitious, modular AI ecosystem designed to coordinate multiple AI models, specialist capabilities, knowledge sources and software tools through one central intelligence architecture.
+AJUSTA is an ambitious, modular AI ecosystem designed as a Jarvis-inspired operating system: one central intelligence coordinating multiple models, specialist skills, knowledge sources, storage systems and approved tools.
 
 Its goal is to help people move from an objective to a well-researched, verified and useful result: understand the request, plan the work, select appropriate capabilities, coordinate execution, evaluate the outcome and explain what was completed.
 
@@ -24,7 +24,7 @@ The system should:
 - Report uncertainty, limitations and completion status honestly.
 - Keep users in control of sensitive or consequential actions.
 
-The vision is ambitious; delivery will be incremental and evidence-driven.
+The vision is ambitious; delivery will be incremental and evidence-driven. The complete target capability specification is in [docs/MASTER_CAPABILITIES.md](docs/MASTER_CAPABILITIES.md).
 
 ## 2. Core Architecture
 
@@ -41,8 +41,11 @@ Independent modules with clear interfaces and responsibilities:
 - **Automation:** permissioned workflow orchestration.
 - **Knowledge:** document ingestion, retrieval and project context.
 
-### Shared Knowledge System
-A controlled layer for storing and retrieving project documents, approved knowledge, task context and references. Access must be permission-aware and traceable.
+### Shared Knowledge and Adaptive Storage
+A controlled layer for storing and retrieving project documents, approved knowledge, task context and references. Storage should scale through replaceable local or cloud adapters, with encryption, backups, access controls, retention, export and deletion. External storage and paid capacity require user consent.
+
+### Skill Learning and Improvement
+AJUSTA should discover capability gaps, research solutions, draft new skills, test them in isolated environments, evaluate results and activate approved versions with rollback. This is controlled, evidence-based improvement—not unrestricted self-modification.
 
 ### Model & Tool Connectors
 Provider-neutral adapters will make it possible to connect different AI models and external tools without coupling the entire system to one provider. External services may require separate accounts, API keys, permissions and usage costs.
@@ -118,7 +121,8 @@ This is a target structure, not a claim that every directory or feature already 
 
 ## 7. Security, Privacy and Human Control
 
-Security is a core design requirement:
+Security is a core design requirement. No system can honestly guarantee 100% security; AJUSTA will measure implemented controls, test results, audit findings and residual risks:
+
 - Never commit API keys, passwords, tokens or private credentials.
 - Keep secrets in environment variables or a dedicated secret manager.
 - Apply least-privilege permissions to tools and modules.
@@ -141,7 +145,11 @@ Each implemented capability should include:
 
 Tests must be run using the commands documented by each component. A feature is not considered complete merely because code has been written.
 
-## 9. Development Roadmap
+## 9. Master Capability Specification
+
+The target design—including Jarvis-style orchestration, broad skill discovery, controlled skill learning, adaptive storage, research-first behavior and measurable security—is documented in [docs/MASTER_CAPABILITIES.md](docs/MASTER_CAPABILITIES.md).
+
+## 10. Development Roadmap
 
 ### Phase 0 — Foundation
 - Confirm repository conventions.
@@ -175,7 +183,7 @@ Tests must be run using the commands documented by each component. A feature is 
 - Measure quality, reliability, latency and cost.
 - Expand capabilities only when they can be tested and maintained.
 
-## 10. Project Principles
+## 11. Project Principles
 
 1. Evidence over unsupported claims.
 2. Clear module boundaries over one giant codebase.
@@ -186,7 +194,7 @@ Tests must be run using the commands documented by each component. A feature is 
 7. Incremental delivery with measurable progress.
 8. Replaceable providers and extensible interfaces.
 
-## 11. Current Status
+## 12. Current Status
 
 **Current stage: Backend orchestration foundation.**
 

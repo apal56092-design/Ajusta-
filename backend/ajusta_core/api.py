@@ -284,6 +284,7 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         return {"items": [
             {
                 "task_id": item.task_id,
+                "instruction": item.instruction,
                 "status": item.status.value,
                 "result": item.result,
                 "evidence": list(item.evidence),

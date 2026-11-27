@@ -27,6 +27,16 @@ class AjustaApiClient {
         request("POST", "/v1/tasks", token = token, body = JSONObject()
             .put("task_id", taskId).put("instruction", instruction))
 
+    fun listTasks(token: String, limit: Int = 50): ApiResult {
+        require(limit in 1..100) { "Task history limit must be between 1 and 100." }
+        return request("GET", "/v1/tasks?limit=$limit", token = token)
+    }
+
+    fun getTask(token: String, taskId: String): ApiResult {
+        require(taskId.matches(Regex("[A-Za-z0-9._-]{1,100}"))) { "Invalid task ID." }
+        return request("GET", "/v1/tasks/$taskId", token = token)
+    }
+
     private fun request(
         method: String,
         path: String,

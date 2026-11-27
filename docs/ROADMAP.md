@@ -22,6 +22,8 @@ A checkbox is complete only when implementation and verification evidence exist.
 
 ## C. AI providers and routing
 - [x] Provider-neutral model adapter and bounded request/response contract
+- [x] OpenAI Responses, Anthropic Messages, xAI Grok Responses and DeepSeek Responses provider adapters (mocked contract tests; live credentials not configured)
+- [x] Configurable provider registration and transient-unavailability fallback order
 - [ ] Model capability registry and routing policy
 - [ ] Timeouts, bounded retries, quotas, budgets and cost reporting
 - [x] Provider fallback only for declared transient unavailability\n- [ ] Emergency provider disable and operator controls
@@ -78,10 +80,12 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. This is not a production-ready application. A concrete OpenAI Responses adapter, server-environment gateway factory, and six model-backed text departments now exist, but live provider credentials are not configured. Specialist department workflows, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
+Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. OpenAI, Anthropic Claude, xAI Grok and DeepSeek provider adapters plus a configurable multi-provider gateway now exist with mocked contract tests. This is not a production-ready application; live provider credentials are not configured and no live model call has been verified. Specialist department workflows, authentication, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
 
 ## J. End-to-end capability targets
-- [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests\n- [ ] Live provider integration test with deployment-managed credentials
+- [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests
+- [x] Anthropic Claude Messages, xAI Grok Responses and DeepSeek Responses adapters with server-side secret boundaries and mocked contract tests
+- [x] Configurable multi-provider registration and transient-failure fallback order\n- [ ] Live provider integration test with deployment-managed credentials
 - [x] Model-backed department-handler bridge into the central Brain (single bounded model request; no tool execution)\n- [x] Synchronous task path joining persistent task records, planning, approval checks, Brain dispatch and result persistence\n- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
 - [ ] Secure Skill Execution Engine with isolation, permissions, resource limits, audit, approval and rollback
 - [ ] Complete persistent database for identity, tasks, skills, permissions and audit history

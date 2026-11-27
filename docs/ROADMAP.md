@@ -10,6 +10,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Persistent skill catalog, schema migrations and dependency-aware planner
 - [ ] Bounded concurrency, durable execution queue, idempotency and cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
+- [x] Runtime factory composes model gateway, departments, persistence and user authentication
 
 ## B. Security and identity
 - [x] SQLite account/session primitives: normalized unique email, PBKDF2 password verifier, opaque random session token, token-hash persistence, expiry and revocation
@@ -30,6 +31,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 ## D. Skills and departments
 - [x] Six model-backed departments registered in the Brain
 - [x] Optional Tavily search adapter for Research, with bounded results, HTTPS source validation, untrusted-excerpt handling and source list
+- [x] Runtime factory enables Tavily Research when TAVILY_API_KEY is configured server-side
 - [ ] Coding department with isolated sandbox and test execution
 - [ ] Persistent skills, isolated execution, permissions, resource limits, review, evaluation and rollback
 - [ ] Real specialist workflows for design, data, business, writing and productivity
@@ -69,7 +71,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Security review, gradual release, monitoring, rollback and support
 
 ## Current implementation status
-AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport and Keystore-backed token encryption. The Android debug APK CI workflow passed after these integration changes. The backend has an optional Tavily search adapter that can be injected into the Research department; it has mocked contract tests, not a live Tavily credential verification. No real public API domain, model credentials, Tavily key, production deployment, code sandbox, autonomous learning loop, complete storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
+AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport and Keystore-backed token encryption. A runtime factory now composes backend services and optionally enables Tavily research from server configuration. The Android debug APK CI workflow passed after these integration changes. The backend has an optional Tavily search adapter that can be injected into the Research department; it has mocked contract tests, not a live Tavily credential verification. No real public API domain, model credentials, Tavily key, production deployment, code sandbox, autonomous learning loop, complete storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
 
 ## J. End-to-end capability targets
 - [x] Model adapters and mocked provider contract tests

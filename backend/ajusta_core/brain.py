@@ -9,6 +9,7 @@ from typing import Protocol
 
 from .models import ModelGateway, ModelRequest
 from .orchestrator import ExecutionPlan
+from .research import ResearchDepartmentHandler
 
 
 class DepartmentHandler(Protocol):
@@ -174,6 +175,7 @@ def register_model_departments(
     gateway: ModelGatewayLike,
     *,
     max_output_tokens: int = 2048,
+    research_search_provider=None,
 ) -> tuple[str, ...]:
     """Register the six default model-backed specialists in an explicit allow-list.
 
@@ -188,6 +190,10 @@ def register_model_departments(
     if conflicts:
         raise ValueError("departments already registered: " + ", ".join(conflicts))
     handlers = tuple(
+        ResearchDepartmentHandler(
+            gateway=gateway,
+            search_provider=research_search_provider,
+        ) if name == "research" and research_search_provider is not None else
         ModelDepartmentHandler(
             name=name,
             gateway=gateway,

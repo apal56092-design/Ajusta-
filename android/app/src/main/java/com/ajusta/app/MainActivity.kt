@@ -88,6 +88,7 @@ private fun AjustaHome() {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var taskDraft by remember { mutableStateOf("") }
+    var activeTaskId by remember { mutableStateOf<String?>(null) }
     var isRegister by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf("Sign in to connect to AJUSTA.") }
@@ -212,6 +213,26 @@ private fun AjustaHome() {
                         busy = false
                     }
                 }) { Text("Sign out") }
+                if (activeTaskId != null) {
+                    Button(onClick = {
+                        val activeToken = token ?: return@Button
+                        val taskId = activeTaskId ?: return@Button
+                        scope.launch {
+                            try {
+                                val cancelled = withContext(Dispatchers.IO) {
+                                    api.cancelAsyncTask(activeToken, taskId)
+                                }
+                                status = if (cancelled.statusCode in 200..299) {
+                                    "Cancellation requested for task " + taskId
+                                } else {
+                                    cancelled.payload.optString("detail", "Task could not be cancelled.")
+                                }
+                            } catch (error: Exception) {
+                                status = "Cancel request failed: " + (error.message ?: "unknown error")
+                            }
+                        }
+                    }) { Text("Cancel task") }
+                }
             }
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -260,39 +281,49 @@ private fun AjustaHome() {
                 busy = true
                 status = "Task AJUSTA Brain ko bheja ja raha hai..."
                 scope.launch {
-                    val progressWatcher = launch {
-                        repeat(45) {
-                            delay(700)
-                            try {
-                                val live = withContext(Dispatchers.IO) { api.getTask(activeToken, taskId) }
-                                if (live.statusCode == 200) {
-                                    val liveStatus = live.payload.optString("status", "running")
-                                    status = "AJUSTA task status: " + liveStatus
-                                    if (liveStatus in setOf("succeeded", "failed", "needs_approval", "cancelled")) {
-                                        return@launch
-                                    }
-                                }
-                            } catch (_: Exception) {
-                                // The submit request remains authoritative if polling is temporarily unavailable.
-                            }
-                        }
-                    }
+                    activeTaskId = taskId
                     try {
                         val response = withContext(Dispatchers.IO) {
-                            api.submitTask(activeToken, taskId, instruction)
+                            api.submitAsyncTask(activeToken, taskId, instruction)
                         }
-                        progressWatcher.cancel()
-                        if (response.statusCode in 200..299) {
-                            val finalStatus = response.payload.optString("status", "completed")
-                            messages.add(ChatMessage(
-                                response.payload.optString("result",
-                                    response.payload.optString("error_message", finalStatus)),
-                                false
-                            ))
-                            status = "Task finished: " + finalStatus
-                        } else {
+                        if (response.statusCode !in 200..299) {
                             status = "Task request failed (" + response.statusCode + "): " +
                                 response.payload.optString("detail", "API error")
+                            activeTaskId = null
+                        } else {
+                            status = "Task queued. AJUSTA is processing it..."
+                            var terminal = false
+                            repeat(120) {
+                                if (!terminal) {
+                                    delay(1000)
+                                    val live = withContext(Dispatchers.IO) {
+                                        api.getAsyncTask(activeToken, taskId)
+                                    }
+                                    if (live.statusCode == 200) {
+                                        val liveStatus = live.payload.optString("status", "queued")
+                                        status = "AJUSTA task status: " + liveStatus
+                                        if (liveStatus in setOf("succeeded", "failed", "needs_approval", "cancelled")) {
+                                            terminal = true
+                                            val resultText = live.payload.optString(
+                                                "result",
+                                                live.payload.optString("error_message", liveStatus)
+                                            )
+                                            messages.add(ChatMessage(resultText, false))
+                                            status = "Task finished: " + liveStatus
+                                            activeTaskId = null
+                                        }
+                                    } else if (live.statusCode == 404) {
+                                        terminal = true
+                                        activeTaskId = null
+                                        status = "Task was not found on the server."
+                                    } else {
+                                        status = "Task status check returned " + live.statusCode
+                                    }
+                                }
+                            }
+                            if (!terminal) {
+                                status = "Task is still running. You can refresh history or cancel it."
+                            }
                         }
                         val historyResponse = withContext(Dispatchers.IO) { api.listTasks(activeToken) }
                         if (historyResponse.statusCode == 200) {
@@ -301,7 +332,6 @@ private fun AjustaHome() {
                     } catch (error: Exception) {
                         status = "Task connection failed: " + (error.message ?: "unknown error")
                     } finally {
-                        progressWatcher.cancel()
                         busy = false
                     }
                 }

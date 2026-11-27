@@ -36,10 +36,15 @@ def test_session_is_opaque_resolvable_and_revocable(tmp_path):
         auth.resolve_session(token)
 
 
-def test_expired_session_is_rejected(tmp_path):
+def test_expired_session_is_rejected(tmp_path, monkeypatch):
+    import ajusta_core.auth as auth_module
+
+    clock = [1_000]
+    monkeypatch.setattr(auth_module.time, "time", lambda: clock[0])
     auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
     user = auth.register_user("person@example.com", "a-long-test-password")
-    token = auth.create_session(user.user_id, ttl_seconds=0)
+    token = auth.create_session(user.user_id, ttl_seconds=1)
+    clock[0] = 1_002
     with pytest.raises(AuthenticationError):
         auth.resolve_session(token)
 

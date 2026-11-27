@@ -7,7 +7,7 @@ AJUSTA is an ambitious, modular AI ecosystem designed to coordinate multiple AI 
 
 Its goal is to help people move from an objective to a well-researched, verified and useful result: understand the request, plan the work, select appropriate capabilities, coordinate execution, evaluate the outcome and explain what was completed.
 
-**Important project-status statement:** This repository currently contains the project vision and initial architecture documentation. Features described as planned are not yet implemented. Implementation status will be updated only after code exists and has been tested.
+**Important project-status statement:** The repository now includes an initial Python backend foundation: deterministic request planning, a central orchestration boundary, department-availability reporting, a consequential-action approval gate, unit tests, and a GitHub Actions test workflow. These components create plans only; they do not yet connect real AI providers, execute specialist work, or provide a production app. Other features remain planned until implemented and verified.
 
 ---
 
@@ -64,7 +64,7 @@ Provider-neutral adapters will make it possible to connect different AI models a
 
 | Area | Intended responsibility | Status |
 |---|---|---|
-| Central Intelligence | Task understanding and orchestration | Planned |
+| Central Intelligence | Initial deterministic planning and routing boundary | Partial |
 | Research | Evidence-based investigation | Planned |
 | Coding | Software engineering workflows | Planned |
 | Design | Product and interface design support | Planned |
@@ -73,7 +73,7 @@ Provider-neutral adapters will make it possible to connect different AI models a
 | Knowledge System | Document and context retrieval | Planned |
 | Automation | Permissioned workflow execution | Planned |
 | Android Client | Mobile user interface | Planned |
-| Security & Governance | Identity, permissions and auditability | Planned |
+| Security & Governance | Initial consequential-action approval gate | Partial |
 
 ## 5. Technology Direction
 
@@ -188,9 +188,9 @@ Tests must be run using the commands documented by each component. A feature is 
 
 ## 11. Current Status
 
-**Current stage: Initial documentation and architecture foundation.**
+**Current stage: Backend orchestration foundation.**
 
-The repository has a README and is being organized. The central intelligence engine, AI departments, model integrations, knowledge system and Android application are still planned work until their implementations and tests are committed.
+The repository contains a deterministic planner, a central orchestration API, a policy approval gate, unit-test specifications, and a CI workflow intended to run the backend tests. This is not yet a connected multi-model AI system: specialist departments, provider adapters, knowledge storage, authentication, and the Kotlin Android client still require implementation. Test status must be confirmed from an actual CI run before calling the tests passing.
 
 ---
 

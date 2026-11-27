@@ -8,9 +8,9 @@ import secrets
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field
 
-from .contracts import TaskRequest, TaskStatus
+from .contracts import TaskRequest
 from .service import TaskExecutionService
 
 
@@ -107,7 +107,7 @@ def create_app(service: TaskExecutionService, *, api_token: str) -> FastAPI:
     def get_task(task_id: str) -> dict[str, object]:
         if len(task_id) > 100:
             raise HTTPException(status_code=404, detail="Task not found.")
-        stored = service._store.get_task(task_id)
+        stored = service.get_task(task_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="Task not found.")
         return {

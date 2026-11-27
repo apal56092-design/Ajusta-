@@ -54,3 +54,30 @@ def test_queue_bounds_payload_and_lease_parameters(tmp_path):
         queue.claim_next("worker", lease_seconds=1)
     with pytest.raises(ValueError):
         queue.enqueue("large", "owner", {"data": "x" * 21000})
+
+
+def test_progress_events_are_owner_scoped_monotonic_and_lease_protected(tmp_path):
+    queue = SQLiteTaskQueue(tmp_path / "progress.sqlite3")
+    queue.enqueue("progress-1", "owner-a", {"instruction": "Do work"})
+    claimed = queue.claim_next("worker-a", lease_seconds=30)
+
+    assert queue.report_progress("progress-1", "wrong-lease", 20, "forged") is False
+    assert queue.report_progress("progress-1", claimed.lease_token, 40, "Researching") is True
+    assert queue.report_progress("progress-1", claimed.lease_token, 30, "Going backwards") is False
+    assert queue.get("progress-1", "owner-a").progress_percent == 40
+    assert queue.get("progress-1", "owner-b") is None
+    assert queue.list_events("progress-1", "owner-b") == []
+    events = queue.list_events("progress-1", "owner-a")
+    assert [event["progress_percent"] for event in events] == [0, 5, 40]
+    assert events[-1]["message"] == "Researching"
+
+
+def test_successful_completion_records_one_hundred_percent(tmp_path):
+    queue = SQLiteTaskQueue(tmp_path / "complete.sqlite3")
+    queue.enqueue("done-1", "owner-a", {"instruction": "Do work"})
+    claimed = queue.claim_next("worker-a", lease_seconds=30)
+    assert queue.complete("done-1", claimed.lease_token, succeeded=True) is True
+    item = queue.get("done-1", "owner-a")
+    assert item.status == "succeeded"
+    assert item.progress_percent == 100
+    assert queue.list_events("done-1", "owner-a")[-1]["message"] == "Task completed"

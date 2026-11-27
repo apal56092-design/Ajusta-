@@ -18,6 +18,8 @@ class AjustaApiClient {
         request("POST", "/v1/auth/login", body = JSONObject()
             .put("email", email).put("password", password))
 
+    fun currentUser(token: String): ApiResult = request("GET", "/v1/auth/me", token = token)
+
     fun logout(token: String): ApiResult =
         request("POST", "/v1/auth/logout", token = token, body = JSONObject())
 

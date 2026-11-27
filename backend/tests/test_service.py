@@ -102,3 +102,19 @@ def test_task_service_records_provider_authentication_failure_safely(tmp_path):
     assert result.status is TaskStatus.FAILED
     assert result.error_code == "MODEL_AUTHENTICATION_FAILED"
     assert "sensitive" not in result.error_message
+
+
+def test_task_service_normalizes_task_id_before_persisting(tmp_path):
+    store = SQLiteTaskStore(tmp_path / "tasks.sqlite3")
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    service = TaskExecutionService(
+        store=store,
+        registry=registry,
+        enabled_departments={"research", "coding", "design", "data", "business", "automation"},
+    )
+
+    result = service.submit("  task-trimmed  ", TaskRequest("Investigate clean energy"))
+
+    assert result.task_id == "task-trimmed"
+    assert store.get_task("task-trimmed").status is TaskStatus.SUCCEEDED

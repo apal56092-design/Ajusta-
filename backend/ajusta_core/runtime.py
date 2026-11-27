@@ -19,6 +19,8 @@ from .skills import SkillManifest
 from .skill_execution import SQLiteSkillAuditStore, SkillExecutionEngine
 from .knowledge_store import SQLiteKnowledgeStore
 from .storage import SQLiteTaskStore
+from .durable_queue import SQLiteTaskQueue
+from .worker import DurableTaskWorker
 
 
 def create_runtime_app(
@@ -51,6 +53,7 @@ def create_runtime_app(
         "research", "coding", "design", "data", "business", "automation"
     }
     store = SQLiteTaskStore(database_path)
+    task_queue = SQLiteTaskQueue(database_path)
     skill_store = SQLiteSkillStore(database_path)
     knowledge_store = SQLiteKnowledgeStore(database_path)
     audit_store = SQLiteSkillAuditStore(database_path)
@@ -161,12 +164,29 @@ def create_runtime_app(
         registry=registry,
         enabled_departments=departments,
     )
+
+    def execute_queued_task(item):
+        from .contracts import TaskRequest
+        payload = item.payload
+        request = TaskRequest(
+            instruction=payload["instruction"],
+            constraints=tuple(payload.get("constraints", ())),
+            output_format=payload.get("output_format", "text"),
+        )
+        result = service.submit(item.task_id, request, user_id=item.owner_id)
+        if result.status.value == "failed":
+            raise RuntimeError("queued task execution failed")
+
+    task_worker = DurableTaskWorker(task_queue, execute_queued_task)
     app = create_app(
         service, auth_store=auth_store, skill_store=skill_store,
         knowledge_store=knowledge_store, skill_engine=skill_engine,
         skill_permission_resolver=resolve_skill_permissions,
+        task_queue=task_queue, task_worker=task_worker,
     )
     app.state.task_service = service
+    app.state.task_queue = task_queue
+    app.state.task_worker = task_worker
     app.state.auth_store = auth_store
     app.state.department_registry = registry
     app.state.skill_store = skill_store

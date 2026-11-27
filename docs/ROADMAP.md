@@ -13,7 +13,8 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Built-in private knowledge-search skill with authenticated-user isolation
 - [x] Optional source-provenance research-search skill when a search provider is configured
 - [ ] Versioned schema migrations and dependency-aware planner
-- [ ] Bounded concurrency, active background worker lifecycle, task/result synchronization and cooperative cancellation
+- [x] Single-worker lifecycle, authenticated async submission/status API, durable queue-to-result synchronization and queued-task cancellation
+- [ ] Bounded multi-worker concurrency, running-task cooperative cancellation and lease renewal
 - [x] Durable SQLite queue primitives: atomic claims, expiring leases, bounded retries and owner-checked queued cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
 - [x] Bounded, authenticated, per-user task history endpoint with owner isolation
@@ -57,12 +58,13 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Registration/login, current-session validation, logout and task submission client
 - [x] HTTPS-only API client and Keystore-backed encrypted session persistence
 - [ ] Configure real HTTPS backend domain and verify live Android-to-API-to-Brain workflow
-- [ ] Android unified chat-history screen consuming the task-history API, projects, attachments, live task progress/cancellation and result views
+- [ ] Android unified chat-history screen consuming the task-history API and async task endpoints, projects, attachments, live task progress/cancellation and result views
 - [ ] Approval inbox, skills catalog, permissions, storage/usage/privacy dashboard
 - [ ] Hindi/English localization and accessibility
 
 ## G. Reliability and operations
-- [ ] Background queue, retries, timeouts, circuit breakers and graceful degradation
+- [x] Durable SQLite background queue, bounded single-worker lifecycle, retry leases and graceful application shutdown
+- [ ] Multi-worker concurrency, handler deadlines, lease renewal, circuit breakers and graceful degradation
 - [ ] Structured logs, metrics, traces, alerts and runbooks
 - [ ] Load/latency/resource tests and disaster-recovery restore drills
 
@@ -80,7 +82,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Security review, gradual release, monitoring, rollback and support
 
 ## Current implementation status
-AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport, Keystore-backed token encryption, a recent per-user task-history screen, and polling of persisted task status while synchronous task execution is running. A runtime factory composes backend services, enables optional Tavily research from server configuration, and exposes a governed skill engine. The Android debug APK CI workflow passed after earlier integration changes, but no live mobile-to-deployed-backend workflow is verified. The backend includes a bounded authenticated task-history endpoint that returns only the caller's own recent tasks, plus user-owned text knowledge storage with FTS5 search, a built-in knowledge-search skill scoped to the authenticated user, and an optional research-search skill that returns source provenance when a provider is configured. Skills execute only through trusted host-registered operations, with active-state checks, input/output validation, server-resolved permission scopes, approval for consequential scopes and minimal audit digests. This is an allowlisted dispatcher, not an OS sandbox; no uploaded or model-generated code is executed. Research and model provider tests are mocked, not live credential verification. No public API domain, production deployment, isolated coding sandbox, autonomous learning loop, complete file/document storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
+AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport, Keystore-backed token encryption, a recent per-user task-history screen, and polling of persisted task status while synchronous task execution is running. A runtime factory composes backend services, enables optional Tavily research from server configuration, and exposes a governed skill engine. The Android debug APK CI workflow passed after earlier integration changes, but no live mobile-to-deployed-backend workflow is verified. The backend includes a bounded authenticated task-history endpoint that returns only the caller's own recent tasks, plus user-owned text knowledge storage with FTS5 search, a built-in knowledge-search skill scoped to the authenticated user, and an optional research-search skill that returns source provenance when a provider is configured. Skills execute only through trusted host-registered operations, with active-state checks, input/output validation, server-resolved permission scopes, approval for consequential scopes and minimal audit digests. This is an allowlisted dispatcher, not an OS sandbox; no uploaded or model-generated code is executed. Research and model provider tests are mocked, not live credential verification. The backend now also exposes authenticated async task enqueue/status/queued-cancel routes backed by the durable SQLite queue and a single explicitly lifecycle-managed worker. The runtime starts/stops that worker with FastAPI; synchronous submission remains supported. Running-task cancellation, multi-worker concurrency, lease renewal, Android async-task integration and production deployment remain incomplete. No public API domain, isolated coding sandbox, autonomous learning loop, complete file/document storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
 
 ## J. End-to-end capability targets
 - [x] Model adapters and mocked provider contract tests

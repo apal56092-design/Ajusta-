@@ -204,3 +204,45 @@ def test_openai_provider_rejects_malformed_success_payload():
     )
     with pytest.raises(ValueError, match="output text"):
         provider.generate(ModelRequest(prompt="Hello"))
+
+
+def test_default_gateway_uses_server_environment_configuration(monkeypatch):
+    import json
+    from ajusta_core.models import create_default_model_gateway
+
+    monkeypatch.setenv("OPENAI_API_KEY", "server-secret")
+    monkeypatch.setenv("OPENAI_MODEL", "configured-model")
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "output": [{
+                    "type": "message",
+                    "content": [{"type": "output_text", "text": "configured response"}],
+                }],
+            }).encode()
+
+    gateway = create_default_model_gateway(
+        transport=lambda request, timeout: FakeResponse()
+    )
+    result = gateway.generate(ModelRequest(prompt="Test configured gateway"))
+
+    assert result.provider == "openai"
+    assert result.model == "configured-model"
+    assert result.text == "configured response"
+
+
+def test_default_gateway_requires_server_environment_configuration(monkeypatch):
+    from ajusta_core.models import create_default_model_gateway
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_MODEL", raising=False)
+
+    with pytest.raises(ValueError, match="API key"):
+        create_default_model_gateway()

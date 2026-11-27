@@ -4,98 +4,77 @@ A checkbox is complete only when implementation and verification evidence exist.
 
 ## A. Foundation and central brain
 - [x] Typed task request/result contracts and lifecycle statuses
-- [x] Initial department routing and central orchestration boundary
-- [x] Declarative skill manifest and in-memory registry lifecycle (draft/review/activate/disable)
-- [x] Explicit department-handler interface, allow-listed registry and central plan dispatcher (in-memory; no real specialist integrations yet)
+- [x] Initial department routing, central orchestration and allow-listed Brain dispatch
+- [x] Declarative skill manifest and in-memory registry lifecycle
 - [x] SQLite-backed durable task request/result storage foundation
-- [ ] Persistent skill catalog and database migrations
-- [ ] Dependency-aware planner, bounded concurrency and cancellation
-- [ ] Structured task state, idempotency and durable execution queue
-- [x] Versioned authenticated task API scaffold (`/v1`); per-user identity and generated client docs remain open
+- [ ] Persistent skill catalog, schema migrations and dependency-aware planner
+- [ ] Bounded concurrency, durable execution queue, idempotency and cancellation
+- [x] Versioned authenticated task API scaffold (shared service token only)
 
 ## B. Security and identity
-- [x] Shared server-side bearer-token gate for controlled API deployments (not suitable as public multi-user identity)
-- [ ] User authentication, session lifecycle and account recovery
-- [ ] Server-side per-user authorization and tenant/object isolation
-- [ ] Permission scopes, approval inbox and revocation
-- [ ] Secret manager and credential rotation
-- [ ] Threat model, security tests and audit events
+- [x] SQLite account/session primitives: normalized unique email, PBKDF2 password verifier, opaque random session token, token-hash persistence, expiry and revocation
+- [ ] Wire user registration/login/logout and session authentication into FastAPI
+- [ ] Enforce per-user task ownership and tenant/object isolation
+- [ ] Rate limiting, abuse protection, account recovery and session/device management
+- [ ] Permission scopes, approval inbox, audit events, secret manager and credential rotation
+- [ ] Threat model, independent security review and remediation
 
 ## C. AI providers and routing
 - [x] Provider-neutral model adapter and bounded request/response contract
-- [x] OpenAI Responses, Anthropic Messages, xAI Grok Responses and DeepSeek Responses provider adapters (mocked contract tests; live credentials not configured)
-- [x] Configurable provider registration and transient-unavailability fallback order
-- [ ] Model capability registry and routing policy
-- [ ] Timeouts, bounded retries, quotas, budgets and cost reporting
-- [x] Provider fallback only for declared transient unavailability\n- [ ] Emergency provider disable and operator controls
-- [ ] User-visible disclosure of external processing and consent
+- [x] OpenAI Responses, Anthropic Messages, xAI Grok Responses and DeepSeek Responses adapters (mocked contract tests only)
+- [x] Configurable provider registration and transient-unavailability fallback
+- [ ] Live provider verification, capability-aware routing, budgets, quotas, retries and cost reporting
+- [ ] Emergency provider disable and user consent for external processing
 
 ## D. Skills and departments
-- [x] Six default model-backed text departments registered in the Brain (no external tools)\n- [ ] Research department with evidence provenance
-- [ ] Coding department with sandbox and test execution
-- [ ] Design, data, business, writing and productivity departments
-- [ ] Persistent skill catalog with audit history
-- [ ] Isolated skill execution, dependency controls and resource limits
-- [ ] Skill authoring workflow, evaluation benchmarks and rollback
+- [x] Six model-backed text departments registered in the Brain (no external tools)
+- [ ] Research department with source retrieval, citations, freshness and provenance
+- [ ] Coding department with isolated sandbox and test execution
+- [ ] Persistent skills, isolated execution, permissions, resource limits, review, evaluation and rollback
+- [ ] Real specialist workflows for design, data, business, writing and productivity
 
 ## E. Knowledge, memory and storage
 - [ ] Storage adapter abstraction and object/file storage
-- [ ] Document ingestion, indexing and retrieval
-- [ ] Provenance, source freshness and access filtering
-- [ ] User-visible memory inspection, correction, export and deletion
+- [ ] Document ingestion, indexing, retrieval, provenance and access filtering
+- [ ] User-controlled memory inspection, correction, export and deletion
 - [ ] Retention across indexes, caches and backups
 - [ ] Encryption, backups, restoration and capacity/cost dashboard
-- [ ] User consent for external storage and paid capacity
 
 ## F. Android and user experience
 - [x] Kotlin Android Jetpack Compose app skeleton and APK build workflow
-- [ ] Secure API client with user-scoped authentication
-- [ ] Unified chat, projects and file attachments
-- [ ] Task plan, progress, cancellation and result screens
-- [ ] Approval inbox and connected-account controls
-- [ ] Skills catalog and permissions screen
-- [ ] Storage, usage and privacy dashboard
+- [ ] Secure API client and user-scoped sign-in/register/logout
+- [ ] Unified chat, projects, attachments, task plan/progress/cancellation/results
+- [ ] Approval inbox, skills catalog, permissions, storage/usage/privacy dashboard
 - [ ] Hindi/English localization and accessibility
 
 ## G. Reliability and operations
-- [ ] Queue and durable task state for long-running work
-- [ ] Health/readiness checks, circuit breakers and graceful degradation
-- [ ] Structured logs, metrics, traces and alerts
-- [ ] Operational dashboards and incident runbooks
-- [ ] Disaster recovery objectives and tested restore drills
-- [ ] Load, latency and resource tests
+- [ ] Background queue, retries, timeouts, circuit breakers and graceful degradation
+- [ ] Structured logs, metrics, traces, alerts and runbooks
+- [ ] Load/latency/resource tests and disaster-recovery restore drills
 
 ## H. Multimodal and integrations
 - [ ] Image, audio and document adapters
-- [ ] Explicit camera/microphone and device permission flows
-- [ ] Connector catalog, sandbox/test accounts and webhook validation
-- [ ] Device automation only through OS-approved permission scopes
-- [ ] Connector disable and credential revocation
+- [ ] OS-approved camera/microphone/device permission flows
+- [ ] Connector catalog, sandbox accounts, webhook validation and credential revocation
 
 ## I. Quality, governance and release
 - [ ] Per-department and end-to-end benchmark suite
 - [ ] Factuality, robustness, safety and privacy evaluation
-- [ ] CI: tests, lint, type checks, static analysis and secret scanning
+- [ ] CI lint, type checks, static analysis and secret scanning
 - [ ] Dependency review, signed builds and protected release process
 - [ ] Privacy notice, terms, acceptable-use and legal review
-- [ ] Security review and remediation
-- [ ] Gradual release, monitoring, rollback and support process
+- [ ] Security review, gradual release, monitoring, rollback and support
 
 ## Current implementation status
-Implemented foundations: deterministic planner/orchestrator, approval-policy foundation, typed task contracts, in-memory skill registry, in-memory department-handler dispatcher, and file-backed SQLite persistence for task requests/results. OpenAI, Anthropic Claude, xAI Grok and DeepSeek provider adapters plus a configurable multi-provider gateway now exist with mocked contract tests. This is not a production-ready application; live provider credentials are not configured and no live model call has been verified. A versioned FastAPI task API with a shared server-side bearer-token gate has been added for controlled testing. It is not per-user authentication and does not isolate task ownership. Specialist department workflows, user authentication/authorization, secure skill sandbox, Android app, complete storage lifecycle, learning/research engine and operational controls remain incomplete. Automated tests have been added; verify the latest GitHub Actions run before treating them as passing.
+AJUSTA has a real but early backend foundation: task contracts, planner/orchestrator, Brain dispatcher, model adapters, synchronous task service, SQLite task persistence, a shared-token FastAPI API, and account/session storage primitives. Android is a Compose starter shell with a CI APK build. The account/session primitives are not yet connected to the API or task ownership. No live model credentials, external research, code sandbox, autonomous learning loop, complete storage system or production deployment have been verified. This is not 100% complete.
 
 ## J. End-to-end capability targets
-- [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests
-- [x] Anthropic Claude Messages, xAI Grok Responses and DeepSeek Responses adapters with server-side secret boundaries and mocked contract tests
-- [x] Configurable multi-provider registration and transient-failure fallback order\n- [ ] Live provider integration test with deployment-managed credentials
-- [x] Model-backed department-handler bridge into the central Brain (single bounded model request; no tool execution)\n- [x] Synchronous task path joining persistent task records, planning, approval checks, Brain dispatch and result persistence\n- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
+- [x] Model adapters and mocked provider contract tests
+- [x] Synchronous task execution and persisted terminal results
+- [x] Native Android app scaffold and successful debug APK CI build
+- [ ] Per-user authenticated end-to-end Android-to-Brain workflow
+- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
 - [ ] Secure Skill Execution Engine with isolation, permissions, resource limits, audit, approval and rollback
-- [ ] Complete persistent database for identity, tasks, skills, permissions and audit history
-- [ ] Adaptive object/file storage with capacity, cost, backup and restore controls
-- [ ] Learning and Research Engine with provenance, freshness and reviewed improvements
-- [x] Versioned FastAPI task endpoints with shared server-side bearer authentication for controlled use
-- [ ] User-scoped authentication and server-enforced authorization across all data and actions
-- [x] Native Kotlin Android application skeleton (not yet connected to backend)
-- [ ] Complete Android app connected to user-authenticated APIs
-- [ ] Real implementations for every department, with evidence and tests
-- [ ] End-to-end acceptance tests from Android/API through brain, model, department/skill, storage and verified result
+- [ ] Complete multi-user database, adaptive storage, backups and restore
+- [ ] Research and learning engine with provenance and reviewed improvements
+- [ ] Real department integrations and evidence-backed end-to-end acceptance tests

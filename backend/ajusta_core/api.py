@@ -9,6 +9,7 @@ from .contracts import TaskRequest
 from .service import TaskExecutionService
 from .skill_store import SQLiteSkillStore, SkillStatus
 from .knowledge_store import SQLiteKnowledgeStore
+from .orchestrator import build_execution_plan
 
 
 class TaskSubmission(BaseModel):
@@ -17,6 +18,11 @@ class TaskSubmission(BaseModel):
     instruction: str = Field(min_length=1, max_length=4000)
     constraints: list[str] = Field(default_factory=list, max_length=20)
     output_format: str = Field(default="text", min_length=1, max_length=40)
+
+
+class PlanSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    instruction: str = Field(min_length=1, max_length=4000)
 
 
 class KnowledgeSubmission(BaseModel):

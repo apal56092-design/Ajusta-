@@ -212,3 +212,11 @@ class ModelGateway:
             return response
 
         raise ModelUnavailableError("all model providers are unavailable: " + "; ".join(failures))
+
+
+def create_default_model_gateway(
+    *, transport: Transport | None = None, timeout: float = 30.0
+) -> ModelGateway:
+    """Build the default gateway from server-side OPENAI_API_KEY and OPENAI_MODEL."""
+    provider = OpenAIResponsesProvider(transport=transport, timeout=timeout)
+    return ModelGateway((provider,))

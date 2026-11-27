@@ -301,7 +301,10 @@ private fun AjustaHome() {
                                     }
                                     if (live.statusCode == 200) {
                                         val liveStatus = live.payload.optString("status", "queued")
-                                        status = "AJUSTA task status: " + liveStatus
+                                        val progress = live.payload.optInt("progress_percent", 0)
+                                        val progressMessage = live.payload.optString("progress_message", "")
+                                        status = "AJUSTA task status: " + liveStatus + " (" +
+                                            progress + "%) " + progressMessage
                                         if (liveStatus in setOf("succeeded", "failed", "needs_approval", "cancelled")) {
                                             terminal = true
                                             val resultText = live.payload.optString(

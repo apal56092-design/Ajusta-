@@ -7,7 +7,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Initial department routing, central orchestration and allow-listed Brain dispatch
 - [x] Declarative skill manifest and in-memory registry lifecycle
 - [x] SQLite-backed durable task request/result storage foundation
-- [ ] Persistent skill catalog, schema migrations and dependency-aware planner
+- [x] Persistent SQLite skill catalog with versioned manifests and reviewed lifecycle state\n- [ ] Versioned schema migrations and dependency-aware planner
 - [ ] Bounded concurrency, durable execution queue, idempotency and cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
 - [x] Runtime factory composes model gateway, departments, persistence and user authentication
@@ -71,7 +71,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Security review, gradual release, monitoring, rollback and support
 
 ## Current implementation status
-AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport and Keystore-backed token encryption. A runtime factory now composes backend services and optionally enables Tavily research from server configuration. The Android debug APK CI workflow passed after these integration changes. The backend has an optional Tavily search adapter that can be injected into the Research department; it has mocked contract tests, not a live Tavily credential verification. No real public API domain, model credentials, Tavily key, production deployment, code sandbox, autonomous learning loop, complete storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
+AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport and Keystore-backed token encryption. A runtime factory now composes backend services and optionally enables Tavily research from server configuration. The Android debug APK CI workflow passed after these integration changes. The backend has an optional Tavily search adapter that can be injected into the Research department; it has mocked contract tests, not a live Tavily credential verification. A durable SQLite skill catalog now stores versioned declarative manifests and review/activation state; it does not execute skill code. No real public API domain, model credentials, Tavily key, production deployment, code sandbox, autonomous learning loop, complete storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
 
 ## J. End-to-end capability targets
 - [x] Model adapters and mocked provider contract tests

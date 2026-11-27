@@ -1,5 +1,6 @@
 from ajusta_core.models import ModelResponse
 from ajusta_core.runtime import create_runtime_app
+from ajusta_core.skill_store import SQLiteSkillStore
 
 
 class FakeGateway:
@@ -36,3 +37,4 @@ def test_runtime_factory_wires_user_auth_and_task_service(tmp_path):
     assert task.status_code == 201
     assert task.json()["status"] == "succeeded"
     assert "coding result" in task.json()["result"]
+    assert isinstance(app.state.skill_store, SQLiteSkillStore)

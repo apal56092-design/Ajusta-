@@ -52,8 +52,7 @@ def test_tavily_provider_rejects_non_https_source():
             ]}).encode()
 
     provider = TavilySearchProvider(api_key="key", transport=lambda request, timeout: Response())
-    with pytest.raises(ValueError, match="HTTPS"):
-        provider.search("query")
+    assert provider.search("query") == ()
 
 
 def test_research_handler_includes_search_evidence_and_source_list():

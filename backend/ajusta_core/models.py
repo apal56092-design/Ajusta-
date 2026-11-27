@@ -368,6 +368,95 @@ class AnthropicMessagesProvider:
         return ModelResponse(provider=self.name, model=self.model, text=answer)
 
 
+class GeminiGenerateContentProvider:
+    """Google Gemini adapter using the Generative Language generateContent API.
+
+    The API key stays on the AJUSTA server and is sent in the x-goog-api-key
+    header. The injected transport keeps tests deterministic and offline.
+    """
+
+    name = "gemini"
+    endpoint_template = (
+        "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    )
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float = 30.0,
+        transport: Transport | None = None,
+    ) -> None:
+        key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY")
+        selected_model = model if model is not None else os.getenv("GEMINI_MODEL", "")
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("Gemini API key is required via server-side configuration")
+        if not isinstance(selected_model, str) or not selected_model.strip():
+            raise ValueError("Gemini model name is required")
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise ValueError("timeout must be a positive number")
+        self._api_key = key.strip()
+        self.model = selected_model.strip()
+        self.endpoint = self.endpoint_template.format(model=self.model)
+        self.timeout = float(timeout)
+        self._transport = transport or (lambda request, seconds: urlopen(request, timeout=seconds))
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        if not isinstance(request, ModelRequest):
+            raise TypeError("request must be a ModelRequest")
+        payload: dict[str, object] = {
+            "contents": [{"role": "user", "parts": [{"text": request.prompt}]}],
+            "generationConfig": {"maxOutputTokens": request.max_output_tokens},
+        }
+        if request.system_prompt:
+            payload["systemInstruction"] = {"parts": [{"text": request.system_prompt}]}
+        http_request = Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "x-goog-api-key": self._api_key,
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            response = self._transport(http_request, self.timeout)
+            with response:
+                body = response.read()
+        except HTTPError as exc:
+            if exc.code in (401, 403):
+                raise ModelAuthenticationError("Gemini authentication failed") from None
+            if exc.code in (408, 429) or exc.code >= 500:
+                raise ModelUnavailableError(
+                    f"Gemini temporarily unavailable (HTTP {exc.code})"
+                ) from None
+            raise ModelRequestError(f"Gemini rejected the request (HTTP {exc.code})") from None
+        except (URLError, TimeoutError, OSError):
+            raise ModelUnavailableError("Gemini network request failed or timed out") from None
+        try:
+            data = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ValueError("Gemini returned malformed JSON") from None
+        if not isinstance(data, dict):
+            raise ValueError("Gemini returned an invalid response object")
+        candidates = data.get("candidates")
+        parts: list[str] = []
+        if isinstance(candidates, list):
+            for candidate in candidates:
+                if not isinstance(candidate, dict):
+                    continue
+                content = candidate.get("content")
+                if not isinstance(content, dict) or not isinstance(content.get("parts"), list):
+                    continue
+                for part in content["parts"]:
+                    if isinstance(part, dict) and isinstance(part.get("text"), str):
+                        parts.append(part["text"])
+        answer = "\\n".join(part for part in parts if part.strip()).strip()
+        if not answer:
+            raise ValueError("Gemini response contains no output text")
+        return ModelResponse(provider=self.name, model=self.model, text=answer)
+
+
 class ModelGateway:
     """Routes requests across explicitly registered providers.
 
@@ -443,7 +532,7 @@ def create_configured_model_gateway(
     """Register every provider whose server-side key and model are configured.
 
     Provider order is configurable with AJUSTA_MODEL_PROVIDER_ORDER, a
-    comma-separated list containing openai, anthropic, xai and/or deepseek.
+    comma-separated list containing openai, anthropic, xai, deepseek and/or gemini.
     Unconfigured providers are simply omitted; no credentials are embedded in
     client code or repository files.
     """
@@ -456,16 +545,18 @@ def create_configured_model_gateway(
         configured["xai"] = XAIResponsesProvider(timeout=timeout, transport=transport)
     if os.getenv("DEEPSEEK_API_KEY") and os.getenv("DEEPSEEK_MODEL"):
         configured["deepseek"] = DeepSeekResponsesProvider(timeout=timeout, transport=transport)
+    if os.getenv("GEMINI_API_KEY") and os.getenv("GEMINI_MODEL"):
+        configured["gemini"] = GeminiGenerateContentProvider(timeout=timeout, transport=transport)
     if not configured:
         raise ValueError("at least one provider key and model must be configured server-side")
 
     raw_order = os.getenv(
-        "AJUSTA_MODEL_PROVIDER_ORDER", "openai,anthropic,xai,deepseek"
+        "AJUSTA_MODEL_PROVIDER_ORDER", "openai,anthropic,xai,deepseek,gemini"
     )
     order = [name.strip().casefold() for name in raw_order.split(",") if name.strip()]
     if len(order) != len(set(order)):
         raise ValueError("AJUSTA_MODEL_PROVIDER_ORDER contains duplicate providers")
-    unknown = set(order) - {"openai", "anthropic", "xai", "deepseek"}
+    unknown = set(order) - {"openai", "anthropic", "xai", "deepseek", "gemini"}
     if unknown:
         raise ValueError("AJUSTA_MODEL_PROVIDER_ORDER contains an unknown provider")
     ordered = [configured[name] for name in order if name in configured]

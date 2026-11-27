@@ -6,6 +6,7 @@ it does not claim semantic search, document ingestion, or model training.
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+import re
 import sqlite3
 from uuid import uuid4
 
@@ -39,6 +40,35 @@ class SQLiteKnowledgeStore:
                 "CREATE INDEX IF NOT EXISTS knowledge_owner_created_idx "
                 "ON knowledge_records(user_id, created_at DESC, id)"
             )
+            connection.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
+                    id UNINDEXED, user_id UNINDEXED, title, content,
+                    tokenize='unicode61'
+                )
+            """)
+            connection.executescript("""
+                CREATE TRIGGER IF NOT EXISTS knowledge_fts_insert
+                AFTER INSERT ON knowledge_records BEGIN
+                    INSERT INTO knowledge_fts(id,user_id,title,content)
+                    VALUES(new.id,new.user_id,new.title,new.content);
+                END;
+                CREATE TRIGGER IF NOT EXISTS knowledge_fts_delete
+                AFTER DELETE ON knowledge_records BEGIN
+                    DELETE FROM knowledge_fts WHERE id=old.id;
+                END;
+                CREATE TRIGGER IF NOT EXISTS knowledge_fts_update
+                AFTER UPDATE ON knowledge_records BEGIN
+                    DELETE FROM knowledge_fts WHERE id=old.id;
+                    INSERT INTO knowledge_fts(id,user_id,title,content)
+                    VALUES(new.id,new.user_id,new.title,new.content);
+                END;
+            """)
+            indexed = connection.execute("SELECT COUNT(*) FROM knowledge_fts").fetchone()[0]
+            if indexed == 0:
+                connection.execute("""
+                    INSERT INTO knowledge_fts(id,user_id,title,content)
+                    SELECT id,user_id,title,content FROM knowledge_records
+                """)
 
     @contextmanager
     def _connect(self):
@@ -82,6 +112,35 @@ class SQLiteKnowledgeStore:
             rows = connection.execute(
                 "SELECT * FROM knowledge_records WHERE user_id=? "
                 "ORDER BY created_at DESC, id DESC", (user_id,)
+            ).fetchall()
+        return tuple(self._record(row) for row in rows)
+
+
+    def search_for_user(
+        self, user_id: str, query: str, *, limit: int = 20
+    ) -> tuple[KnowledgeRecord, ...]:
+        """Search title and content with FTS5 while enforcing owner isolation."""
+        if not isinstance(user_id, str) or not user_id:
+            raise ValueError("user_id is required")
+        if not isinstance(query, str):
+            raise TypeError("query must be a string")
+        terms = re.findall(r"[^\W_]+", query, flags=re.UNICODE)
+        if not terms:
+            raise ValueError("query must contain searchable words")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        match_query = " AND ".join('"' + term.replace('"', '""') + '"' for term in terms[:12])
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT records.*
+                FROM knowledge_fts
+                JOIN knowledge_records AS records ON records.id = knowledge_fts.id
+                WHERE knowledge_fts MATCH ? AND records.user_id = ?
+                ORDER BY bm25(knowledge_fts), records.created_at DESC
+                LIMIT ?
+                """,
+                (match_query, user_id, limit),
             ).fetchall()
         return tuple(self._record(row) for row in rows)
 

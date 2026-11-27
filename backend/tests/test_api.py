@@ -278,7 +278,7 @@ def test_skill_execution_api_requires_user_session_and_server_permissions(tmp_pa
     )
     app = create_app(
         service, auth_store=auth, skill_store=catalog, skill_engine=engine,
-        skill_permission_resolver=lambda uid, required: {"knowledge.read"} if uid == user_id else set(),
+        skill_permission_resolver=lambda uid, required: set(),
     )
     client = TestClient(app)
     body = {"inputs": {"term": "ajusta"}, "approved_by_user": False}

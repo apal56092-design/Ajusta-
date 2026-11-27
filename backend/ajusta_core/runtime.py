@@ -100,10 +100,57 @@ def create_runtime_app(
 
     skill_engine.register_operation("knowledge_search", "1.0.0", search_private_knowledge)
 
+    permitted_scopes = {"knowledge.read"}
+    if selected_search is not None:
+        try:
+            skill_store.get("research_search", "1.0.0")
+        except KeyError:
+            skill_store.register(SkillManifest(
+                name="research_search", version="1.0.0",
+                description="Search the configured research provider and return source provenance.",
+                input_schema={
+                    "type": "object", "required": ["query"],
+                    "properties": {"query": {"type": "string"}},
+                    "additionalProperties": False,
+                },
+                output_schema={
+                    "type": "object", "required": ["sources"],
+                    "properties": {"sources": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["title", "url", "content", "score"],
+                            "properties": {
+                                "title": {"type": "string"}, "url": {"type": "string"},
+                                "content": {"type": "string"}, "score": {"type": "number"},
+                            },
+                            "additionalProperties": False,
+                        },
+                    }},
+                    "additionalProperties": False,
+                },
+                permissions=("research.search",),
+            ))
+            skill_store.approve("research_search", "1.0.0")
+            skill_store.activate("research_search", "1.0.0")
+
+        def search_research_sources(inputs):
+            sources = selected_search.search(inputs["query"], max_results=5)
+            return {"sources": [
+                {"title": source.title, "url": source.url,
+                 "content": source.content, "score": source.score}
+                for source in sources
+            ]}
+
+        skill_engine.register_operation(
+            "research_search", "1.0.0", search_research_sources
+        )
+        permitted_scopes.add("research.search")
+
     def resolve_skill_permissions(user_id, required_permissions):
-        # Authentication is already verified by the API. Runtime grants only
-        # the safe read scope for the caller's own user-scoped knowledge.
-        if set(required_permissions).issubset({"knowledge.read"}):
+        # Authentication is already verified by the API. Grant only the
+        # caller's private-knowledge read scope and configured research search.
+        if set(required_permissions).issubset(permitted_scopes):
             return frozenset(required_permissions)
         return frozenset()
 
@@ -126,4 +173,5 @@ def create_runtime_app(
     app.state.skill_engine = skill_engine
     app.state.knowledge_store = knowledge_store
     app.state.skill_audit_store = audit_store
+    app.state.research_search_provider = selected_search
     return app

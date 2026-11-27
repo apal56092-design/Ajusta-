@@ -98,3 +98,18 @@ AJUSTA now has a user-session FastAPI mode with registration/login/logout/curren
 - [ ] Complete multi-user database, adaptive object/file storage, backups and restore
 - [ ] Reviewed learning engine and persistent skill catalog
 - [ ] Real department integrations and evidence-backed end-to-end acceptance tests
+
+
+## K. Unified Intelligence Architecture (target architecture)
+- [ ] Central Intelligence Core: capability-aware model/tool/skill routing, planning, verification and fallback
+- [ ] Multi-agent coordination: isolated specialist roles, shared task contracts, bounded delegation and conflict resolution
+- [ ] Advanced reasoning workflows: decomposition, evidence tracking, uncertainty and independent result checks
+- [ ] Deep Research: multi-source retrieval, source credibility checks, citations and synthesis
+- [ ] Controlled improvement: feedback capture, benchmark-driven changes, human review, staged rollout and rollback; no silent self-modifying production code
+- [ ] Universal skills lifecycle: authoring, schema validation, permission review, sandbox evaluation, versioning and rollback
+- [ ] Persistent Knowledge Brain: user-controlled long-term memory, searchable documents and provenance-aware knowledge graph
+- [ ] Autonomous Task Engine: durable workers, idempotency, progress events, cancellation, retries, deadlines and recovery
+- [ ] Multimodal intelligence: text, image, audio, video and document understanding with explicit permissions
+- [ ] Governance core: least-privilege permissions, approval inbox, audit trail, privacy controls and abuse protections
+- [ ] Capability benchmarks: measure accuracy, groundedness, task completion, latency, cost, robustness and privacy per department
+- [ ] Release gates: no capability marked complete until automated tests, security review and end-to-end evidence pass

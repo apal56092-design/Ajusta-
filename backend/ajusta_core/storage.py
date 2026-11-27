@@ -89,6 +89,39 @@ class SQLiteTaskStore:
             if cursor.rowcount != 1:
                 raise KeyError(f"task {result.task_id!r} does not exist")
 
+
+    def list_tasks(self, *, user_id: str | None = None, limit: int = 20) -> tuple[StoredTask, ...]:
+        """Return the newest tasks for exactly one owner, with a bounded result size."""
+        if not isinstance(limit, int) or isinstance(limit, bool) or not 1 <= limit <= 100:
+            raise ValueError("limit must be between 1 and 100")
+        with self._connection() as connection:
+            if user_id is None:
+                rows = connection.execute(
+                    """SELECT task_id,instruction,status,result,evidence_json,error_code,
+                       error_message,user_id FROM tasks WHERE user_id IS NULL
+                       ORDER BY created_at DESC, task_id DESC LIMIT ?""",
+                    (limit,),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    """SELECT task_id,instruction,status,result,evidence_json,error_code,
+                       error_message,user_id FROM tasks WHERE user_id=?
+                       ORDER BY created_at DESC, task_id DESC LIMIT ?""",
+                    (user_id, limit),
+                ).fetchall()
+        items = []
+        for row in rows:
+            evidence = json.loads(row["evidence_json"])
+            if not isinstance(evidence, list) or any(not isinstance(item, str) for item in evidence):
+                raise ValueError("stored task evidence is invalid")
+            items.append(StoredTask(
+                task_id=row["task_id"], instruction=row["instruction"],
+                status=TaskStatus(row["status"]), result=row["result"],
+                evidence=tuple(evidence), error_code=row["error_code"],
+                error_message=row["error_message"], user_id=row["user_id"],
+            ))
+        return tuple(items)
+
     def get_task(self, task_id: str, *, user_id: str | None = None) -> StoredTask | None:
         with self._connection() as connection:
             if user_id is None:

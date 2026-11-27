@@ -14,6 +14,7 @@ from .brain import DepartmentRegistry, register_model_departments
 from .models import create_configured_model_gateway
 from .research import TavilySearchProvider
 from .service import TaskExecutionService
+from .skill_store import SQLiteSkillStore
 from .storage import SQLiteTaskStore
 
 
@@ -29,7 +30,8 @@ def create_runtime_app(
 
     Inject gateway/search_provider in tests. In deployments, provider keys and model
     names are read from server environment variables. The Tavily adapter is enabled
-    automatically only when TAVILY_API_KEY exists.
+    automatically only when TAVILY_API_KEY exists. Skill manifests and review state
+    are persisted in the task database; this catalog never executes skill code.
     """
     selected_gateway = gateway or create_configured_model_gateway()
     selected_search = search_provider
@@ -46,6 +48,7 @@ def create_runtime_app(
         "research", "coding", "design", "data", "business", "automation"
     }
     store = SQLiteTaskStore(database_path)
+    skill_store = SQLiteSkillStore(database_path)
     auth_path = auth_database_path or database_path
     auth_store = SQLiteAuthStore(auth_path)
     service = TaskExecutionService(
@@ -57,4 +60,5 @@ def create_runtime_app(
     app.state.task_service = service
     app.state.auth_store = auth_store
     app.state.department_registry = registry
+    app.state.skill_store = skill_store
     return app

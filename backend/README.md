@@ -11,17 +11,15 @@ From this directory: `python -m pytest`
 
 ## Implemented foundation
 - Typed, validated task request/result contracts and lifecycle statuses.
-- Validates and normalizes a user request.
-- Routes requests to specialist departments using transparent keyword rules.
-- Central orchestrator combines the planner, enabled-department registry and action policy.
-- Explicit department-handler interface and allow-listed registry.
-- Central brain dispatches a plan only to registered handlers and returns completed/partial/unavailable outcomes.
-- Reports requested departments that are not enabled instead of pretending they are connected.
+- Validates and normalizes a user request and routes it using transparent keyword rules.
+- Central orchestrator combines planning, enabled-department registry and action policy.
+- Explicit department-handler interface and allow-listed central brain dispatcher.
+- Brain reports completed, partial or unavailable department outcomes.
+- SQLite-backed durable task store persists task requests and results across store instances.
+- Explicit duplicate-ID handling, missing-task errors and evidence serialization.
 - Blocks consequential actions unless explicit user approval is present.
-- Declarative skill manifests with name/version/schema/permission validation.
-- In-memory skill registry with draft → approved → active lifecycle and explicit disable/re-review.
-- Skill registration stores metadata only; it does not execute downloaded or generated code.
-- Unit tests specify contracts, planner, policy, orchestration, brain dispatch and skill-registry behavior.
+- Declarative skill manifests and in-memory skill registry with draft/review/activate/disable lifecycle.
+- Unit tests specify contracts, planning, policy, orchestration, brain dispatch, skill registry and SQLite storage.
 
-## Not connected yet
-No AI provider is connected; the registered department handlers are interfaces only until real specialist adapters are implemented; no external tools are invoked; no persistent database, authentication service, Android client, long-term memory, sandboxed skill runner, autonomous learning pipeline, or production deployment exists. The skill registry is currently in-memory and is not a security sandbox. The central brain dispatches to explicitly registered handlers but does not yet route models, schedule dependencies, stream progress, cancel running work, or evaluate evidence. Add integrations behind documented interfaces, permission checks and tests.
+## Not connected or production-ready yet
+No AI provider is connected; department handlers are interfaces until real specialist adapters are implemented; no external tools are invoked; no authentication service, Kotlin Android client, sandboxed skill runner, autonomous learning pipeline, or production deployment exists. The skill registry remains in-memory and is not a sandbox. SQLite currently stores task records only; it is not yet a complete database model for users, permissions, skills, audit history or files. There is no migration, backup/restore, encryption-at-rest or multi-user authorization layer. The central brain does not yet route models, schedule dependencies, stream progress, cancel running work or evaluate evidence.

@@ -5,6 +5,7 @@ from ajusta_core.skills import (
     SkillRegistry,
     SkillStatus,
     SkillValidationError,
+    validate_manifest,
 )
 
 
@@ -68,9 +69,9 @@ def test_skill_can_be_disabled_and_reenabled_only_after_review():
 
 def test_manifest_rejects_invalid_names_and_permissions():
     with pytest.raises(SkillValidationError):
-        manifest(name="../unsafe")
+        validate_manifest(manifest(name="../unsafe"))
     with pytest.raises(SkillValidationError):
-        manifest(permissions=("../filesystem",))
+        validate_manifest(manifest(permissions=("../filesystem",)))
 
 
 def test_registry_does_not_grant_permissions_implicitly():

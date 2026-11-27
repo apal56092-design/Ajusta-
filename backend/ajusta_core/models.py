@@ -153,6 +153,221 @@ class OpenAIResponsesProvider:
         return ModelResponse(provider=self.name, model=self.model, text=answer)
 
 
+class _ResponsesCompatibleProvider:
+    """Shared adapter for providers implementing the OpenAI Responses wire format."""
+
+    def __init__(
+        self,
+        *,
+        name: str,
+        endpoint: str,
+        api_key: str | None,
+        model: str | None,
+        timeout: float,
+        transport: Transport | None,
+    ) -> None:
+        if not isinstance(api_key, str) or not api_key.strip():
+            raise ValueError(f"{name} API key is required via server-side configuration")
+        if not isinstance(model, str) or not model.strip():
+            raise ValueError(f"{name} model name is required")
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise ValueError("timeout must be a positive number")
+        self.name = name
+        self.endpoint = endpoint
+        self._api_key = api_key.strip()
+        self.model = model.strip()
+        self.timeout = float(timeout)
+        self._transport = transport or (lambda request, seconds: urlopen(request, timeout=seconds))
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        if not isinstance(request, ModelRequest):
+            raise TypeError("request must be a ModelRequest")
+        payload: dict[str, object] = {
+            "model": self.model,
+            "input": request.prompt,
+            "max_output_tokens": request.max_output_tokens,
+            "store": False,
+        }
+        if request.system_prompt:
+            payload["instructions"] = request.system_prompt
+        http_request = Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            response = self._transport(http_request, self.timeout)
+            with response:
+                body = response.read()
+        except HTTPError as exc:
+            if exc.code in (401, 403):
+                raise ModelAuthenticationError(f"{self.name} authentication failed") from None
+            if exc.code in (408, 429) or exc.code >= 500:
+                raise ModelUnavailableError(
+                    f"{self.name} temporarily unavailable (HTTP {exc.code})"
+                ) from None
+            raise ModelRequestError(
+                f"{self.name} rejected the request (HTTP {exc.code})"
+            ) from None
+        except (URLError, TimeoutError, OSError):
+            raise ModelUnavailableError(
+                f"{self.name} network request failed or timed out"
+            ) from None
+        try:
+            data = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ValueError(f"{self.name} returned malformed JSON") from None
+        if not isinstance(data, dict):
+            raise ValueError(f"{self.name} returned an invalid response object")
+        parts: list[str] = []
+        output = data.get("output")
+        if isinstance(output, list):
+            for item in output:
+                if not isinstance(item, dict) or item.get("type") != "message":
+                    continue
+                content = item.get("content")
+                if isinstance(content, list):
+                    for part in content:
+                        if (
+                            isinstance(part, dict)
+                            and part.get("type") == "output_text"
+                            and isinstance(part.get("text"), str)
+                        ):
+                            parts.append(part["text"])
+        answer = "\\n".join(part for part in parts if part.strip()).strip()
+        if not answer:
+            raise ValueError(f"{self.name} response contains no output text")
+        return ModelResponse(provider=self.name, model=self.model, text=answer)
+
+
+class XAIResponsesProvider(_ResponsesCompatibleProvider):
+    """Grok adapter using xAI's OpenAI-compatible Responses API."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float = 30.0,
+        transport: Transport | None = None,
+    ) -> None:
+        super().__init__(
+            name="xai",
+            endpoint="https://api.x.ai/v1/responses",
+            api_key=api_key if api_key is not None else os.getenv("XAI_API_KEY"),
+            model=model if model is not None else os.getenv("XAI_MODEL", ""),
+            timeout=timeout,
+            transport=transport,
+        )
+
+
+class DeepSeekResponsesProvider(_ResponsesCompatibleProvider):
+    """DeepSeek adapter using its OpenAI Responses-compatible endpoint."""
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float = 30.0,
+        transport: Transport | None = None,
+    ) -> None:
+        super().__init__(
+            name="deepseek",
+            endpoint="https://api.deepseek.com/responses",
+            api_key=api_key if api_key is not None else os.getenv("DEEPSEEK_API_KEY"),
+            model=model if model is not None else os.getenv("DEEPSEEK_MODEL", ""),
+            timeout=timeout,
+            transport=transport,
+        )
+
+
+class AnthropicMessagesProvider:
+    """Anthropic Claude adapter using the Messages API and server-side credentials."""
+
+    name = "anthropic"
+    endpoint = "https://api.anthropic.com/v1/messages"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float = 30.0,
+        transport: Transport | None = None,
+    ) -> None:
+        key = api_key if api_key is not None else os.getenv("ANTHROPIC_API_KEY")
+        selected_model = model if model is not None else os.getenv("ANTHROPIC_MODEL", "")
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("Anthropic API key is required via server-side configuration")
+        if not isinstance(selected_model, str) or not selected_model.strip():
+            raise ValueError("Anthropic model name is required")
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise ValueError("timeout must be a positive number")
+        self._api_key = key.strip()
+        self.model = selected_model.strip()
+        self.timeout = float(timeout)
+        self._transport = transport or (lambda request, seconds: urlopen(request, timeout=seconds))
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        if not isinstance(request, ModelRequest):
+            raise TypeError("request must be a ModelRequest")
+        payload: dict[str, object] = {
+            "model": self.model,
+            "max_tokens": request.max_output_tokens,
+            "messages": [{"role": "user", "content": request.prompt}],
+        }
+        if request.system_prompt:
+            payload["system"] = request.system_prompt
+        http_request = Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "x-api-key": self._api_key,
+                "anthropic-version": "2023-06-01",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            response = self._transport(http_request, self.timeout)
+            with response:
+                body = response.read()
+        except HTTPError as exc:
+            if exc.code in (401, 403):
+                raise ModelAuthenticationError("Anthropic authentication failed") from None
+            if exc.code in (408, 429) or exc.code >= 500:
+                raise ModelUnavailableError(
+                    f"Anthropic temporarily unavailable (HTTP {exc.code})"
+                ) from None
+            raise ModelRequestError(
+                f"Anthropic rejected the request (HTTP {exc.code})"
+            ) from None
+        except (URLError, TimeoutError, OSError):
+            raise ModelUnavailableError(
+                "Anthropic network request failed or timed out"
+            ) from None
+        try:
+            data = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ValueError("Anthropic returned malformed JSON") from None
+        if not isinstance(data, dict):
+            raise ValueError("Anthropic returned an invalid response object")
+        content = data.get("content")
+        parts = [
+            item["text"]
+            for item in content
+            if isinstance(item, dict)
+            and item.get("type") == "text"
+            and isinstance(item.get("text"), str)
+        ] if isinstance(content, list) else []
+        answer = "\\n".join(part for part in parts if part.strip()).strip()
+        if not answer:
+            raise ValueError("Anthropic response contains no output text")
+        return ModelResponse(provider=self.name, model=self.model, text=answer)
+
+
 class ModelGateway:
     """Routes requests across explicitly registered providers.
 
@@ -220,3 +435,39 @@ def create_default_model_gateway(
     """Build the default gateway from server-side OPENAI_API_KEY and OPENAI_MODEL."""
     provider = OpenAIResponsesProvider(transport=transport, timeout=timeout)
     return ModelGateway((provider,))
+
+
+def create_configured_model_gateway(
+    *, transport: Transport | None = None, timeout: float = 30.0
+) -> ModelGateway:
+    """Register every provider whose server-side key and model are configured.
+
+    Provider order is configurable with AJUSTA_MODEL_PROVIDER_ORDER, a
+    comma-separated list containing openai, anthropic, xai and/or deepseek.
+    Unconfigured providers are simply omitted; no credentials are embedded in
+    client code or repository files.
+    """
+    configured: dict[str, ModelProvider] = {}
+    if os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_MODEL"):
+        configured["openai"] = OpenAIResponsesProvider(timeout=timeout, transport=transport)
+    if os.getenv("ANTHROPIC_API_KEY") and os.getenv("ANTHROPIC_MODEL"):
+        configured["anthropic"] = AnthropicMessagesProvider(timeout=timeout, transport=transport)
+    if os.getenv("XAI_API_KEY") and os.getenv("XAI_MODEL"):
+        configured["xai"] = XAIResponsesProvider(timeout=timeout, transport=transport)
+    if os.getenv("DEEPSEEK_API_KEY") and os.getenv("DEEPSEEK_MODEL"):
+        configured["deepseek"] = DeepSeekResponsesProvider(timeout=timeout, transport=transport)
+    if not configured:
+        raise ValueError("at least one provider key and model must be configured server-side")
+
+    raw_order = os.getenv(
+        "AJUSTA_MODEL_PROVIDER_ORDER", "openai,anthropic,xai,deepseek"
+    )
+    order = [name.strip().casefold() for name in raw_order.split(",") if name.strip()]
+    if len(order) != len(set(order)):
+        raise ValueError("AJUSTA_MODEL_PROVIDER_ORDER contains duplicate providers")
+    unknown = set(order) - {"openai", "anthropic", "xai", "deepseek"}
+    if unknown:
+        raise ValueError("AJUSTA_MODEL_PROVIDER_ORDER contains an unknown provider")
+    ordered = [configured[name] for name in order if name in configured]
+    ordered.extend(provider for name, provider in configured.items() if name not in order)
+    return ModelGateway(tuple(ordered))

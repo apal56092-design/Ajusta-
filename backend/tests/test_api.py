@@ -237,3 +237,104 @@ def test_knowledge_search_api_is_authenticated_and_user_scoped(tmp_path):
                        headers={"Authorization": f"Bearer {two}"})
     assert own.status_code == 200 and len(own.json()["items"]) == 1
     assert other.status_code == 200 and len(other.json()["items"]) == 1
+
+
+def test_skill_execution_api_requires_user_session_and_server_permissions(tmp_path):
+    from ajusta_core.auth import SQLiteAuthStore
+    from ajusta_core.skills import SkillManifest
+    from ajusta_core.skill_store import SQLiteSkillStore
+    from ajusta_core.skill_execution import SQLiteSkillAuditStore, SkillExecutionEngine
+
+    auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
+    auth.register_user("skill-user@example.com", "long-password-one")
+    token = auth.create_session(
+        auth.authenticate("skill-user@example.com", "long-password-one").user_id
+    )
+    user_id = auth.authenticate("skill-user@example.com", "long-password-one").user_id
+    catalog = SQLiteSkillStore(tmp_path / "skills.sqlite3")
+    catalog.register(SkillManifest(
+        name="safe_lookup", version="1.0.0", description="Look up a safe test value",
+        input_schema={"type": "object", "required": ["term"],
+                      "properties": {"term": {"type": "string"}},
+                      "additionalProperties": False},
+        output_schema={"type": "object", "required": ["result"],
+                       "properties": {"result": {"type": "string"}},
+                       "additionalProperties": False},
+        permissions=("knowledge.read",),
+    ))
+    catalog.approve("safe_lookup")
+    catalog.activate("safe_lookup")
+    engine = SkillExecutionEngine(
+        skill_store=catalog,
+        audit_store=SQLiteSkillAuditStore(tmp_path / "audit.sqlite3"),
+    )
+    engine.register_operation("safe_lookup", "1.0.0",
+                              lambda data: {"result": data["term"].upper()})
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    service = TaskExecutionService(
+        store=SQLiteTaskStore(tmp_path / "tasks.sqlite3"),
+        registry=registry, enabled_departments={"research"},
+    )
+    app = create_app(
+        service, auth_store=auth, skill_store=catalog, skill_engine=engine,
+        skill_permission_resolver=lambda uid, required: set(),
+    )
+    client = TestClient(app)
+    body = {"inputs": {"term": "ajusta"}, "approved_by_user": False}
+
+    assert client.post("/v1/skills/safe_lookup/1.0.0/execute", json=body).status_code == 401
+    denied = client.post("/v1/skills/safe_lookup/1.0.0/execute", json=body,
+                         headers={"Authorization": f"Bearer {token}"})
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "Skill permissions are not granted for this user."
+
+    app = create_app(
+        service, auth_store=auth, skill_store=catalog, skill_engine=engine,
+        skill_permission_resolver=lambda uid, required: set(required),
+    )
+    client = TestClient(app)
+    executed = client.post("/v1/skills/safe_lookup/1.0.0/execute", json=body,
+                           headers={"Authorization": f"Bearer {token}"})
+    assert executed.status_code == 200
+    assert executed.json()["status"] == "succeeded"
+    assert executed.json()["output"] == {"result": "AJUSTA"}
+
+
+def test_skill_execution_api_fails_closed_without_permission_resolver(tmp_path):
+    from ajusta_core.auth import SQLiteAuthStore
+    from ajusta_core.skills import SkillManifest
+    from ajusta_core.skill_store import SQLiteSkillStore
+    from ajusta_core.skill_execution import SQLiteSkillAuditStore, SkillExecutionEngine
+
+    auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
+    auth.register_user("closed@example.com", "long-password-one")
+    token = auth.create_session(
+        auth.authenticate("closed@example.com", "long-password-one").user_id
+    )
+    catalog = SQLiteSkillStore(tmp_path / "skills.sqlite3")
+    catalog.register(SkillManifest(
+        name="safe_lookup", version="1.0.0", description="Look up a safe test value",
+        input_schema={"type": "object"}, output_schema={"type": "object"},
+    ))
+    catalog.approve("safe_lookup")
+    catalog.activate("safe_lookup")
+    engine = SkillExecutionEngine(
+        skill_store=catalog, audit_store=SQLiteSkillAuditStore(tmp_path / "audit.sqlite3")
+    )
+    engine.register_operation("safe_lookup", "1.0.0", lambda data: {"ok": True})
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    service = TaskExecutionService(
+        store=SQLiteTaskStore(tmp_path / "tasks.sqlite3"),
+        registry=registry, enabled_departments={"research"},
+    )
+    client = TestClient(create_app(
+        service, auth_store=auth, skill_store=catalog, skill_engine=engine
+    ))
+    response = client.post(
+        "/v1/skills/safe_lookup/1.0.0/execute",
+        json={"inputs": {}, "approved_by_user": False},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 503

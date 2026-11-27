@@ -1,5 +1,6 @@
 """AJUSTA HTTP API: user sessions for mobile clients plus legacy private token mode."""
 import secrets
+from collections.abc import Callable
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
@@ -10,6 +11,7 @@ from .service import TaskExecutionService
 from .skill_store import SQLiteSkillStore, SkillStatus
 from .knowledge_store import SQLiteKnowledgeStore
 from .orchestrator import build_execution_plan
+from .skill_execution import SkillExecutionEngine
 
 
 class TaskSubmission(BaseModel):
@@ -37,6 +39,12 @@ class Credentials(BaseModel):
     password: str = Field(min_length=12, max_length=256)
 
 
+class SkillExecutionSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    inputs: dict = Field(default_factory=dict)
+    approved_by_user: bool = False
+
+
 class TaskResponse(BaseModel):
     task_id: str
     status: str
@@ -55,7 +63,9 @@ def _result_payload(result):
 def create_app(service: TaskExecutionService, *, api_token: str | None = None,
                auth_store: SQLiteAuthStore | None = None,
                skill_store: SQLiteSkillStore | None = None,
-               knowledge_store: SQLiteKnowledgeStore | None = None) -> FastAPI:
+               knowledge_store: SQLiteKnowledgeStore | None = None,
+               skill_engine: SkillExecutionEngine | None = None,
+               skill_permission_resolver: Callable[[str, tuple[str, ...]], set[str] | frozenset[str]] | None = None) -> FastAPI:
     """Create app in user-session mode or restricted legacy service-token mode."""
     if not isinstance(service, TaskExecutionService):
         raise TypeError("service must be a TaskExecutionService")
@@ -67,6 +77,10 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         raise TypeError("skill_store must be a SQLiteSkillStore")
     if knowledge_store is not None and not isinstance(knowledge_store, SQLiteKnowledgeStore):
         raise TypeError("knowledge_store must be a SQLiteKnowledgeStore")
+    if skill_engine is not None and not isinstance(skill_engine, SkillExecutionEngine):
+        raise TypeError("skill_engine must be a SkillExecutionEngine")
+    if skill_permission_resolver is not None and not callable(skill_permission_resolver):
+        raise TypeError("skill_permission_resolver must be callable")
 
     app = FastAPI(title="AJUSTA API", version="0.2.0")
     bearer = HTTPBearer(auto_error=False)
@@ -123,6 +137,45 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         if user is None:
             raise HTTPException(status_code=404, detail="User sessions are not enabled.")
         return {"user_id": user.user_id, "email": user.email}
+
+    @app.post("/v1/skills/{name}/{version}/execute")
+    def execute_skill(name: str, version: str, body: SkillExecutionSubmission,
+                      user=Depends(identity)):
+        """Execute one active, host-registered skill with server-resolved permissions."""
+        require_user_session(user)
+        if skill_store is None or skill_engine is None or skill_permission_resolver is None:
+            raise HTTPException(status_code=503, detail="Governed skill execution is not configured.")
+        try:
+            registered = skill_store.get(name, version)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Skill not found.") from None
+        try:
+            grants = skill_permission_resolver(user.user_id, tuple(registered.permissions))
+        except Exception:
+            raise HTTPException(status_code=503, detail="Skill permissions could not be resolved.") from None
+        if not isinstance(grants, (set, frozenset)) or not set(registered.permissions).issubset(grants):
+            raise HTTPException(status_code=403, detail="Skill permissions are not granted for this user.")
+        try:
+            result = skill_engine.execute(
+                name=name, version=version, user_id=user.user_id,
+                inputs=body.inputs, granted_permissions=grants,
+                approved_by_user=body.approved_by_user,
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Skill not found.") from None
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        except Exception:
+            raise HTTPException(status_code=500, detail="Skill execution failed.") from None
+        return {
+            "execution_id": result.execution_id,
+            "skill": result.skill_name,
+            "version": result.skill_version,
+            "status": result.status,
+            "output": result.output,
+        }
 
     @app.get("/v1/skills")
     def list_active_skills(user=Depends(identity)):

@@ -392,3 +392,63 @@ def test_configured_gateway_requires_at_least_one_provider(monkeypatch):
 
     with pytest.raises(ValueError, match="at least one"):
         create_configured_model_gateway()
+
+
+def test_gemini_provider_uses_generate_content_api_and_extracts_text():
+    import json
+    from ajusta_core.models import GeminiGenerateContentProvider
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "candidates": [{
+                    "content": {"parts": [{"text": "Gemini answer"}]}
+                }]
+            }).encode()
+
+    def transport(request, timeout):
+        captured["url"] = request.full_url
+        captured["key"] = request.get_header("X-goog-api-key")
+        captured["payload"] = json.loads(request.data.decode())
+        return FakeResponse()
+
+    provider = GeminiGenerateContentProvider(
+        api_key="gemini-secret", model="gemini-test", transport=transport
+    )
+    result = provider.generate(ModelRequest(
+        prompt="Hello", system_prompt="Be concise", max_output_tokens=88
+    ))
+
+    assert result.provider == "gemini"
+    assert result.model == "gemini-test"
+    assert result.text == "Gemini answer"
+    assert captured["url"] == (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-test:generateContent"
+    )
+    assert captured["key"] == "gemini-secret"
+    assert captured["payload"]["systemInstruction"]["parts"][0]["text"] == "Be concise"
+    assert captured["payload"]["contents"][0]["parts"][0]["text"] == "Hello"
+    assert captured["payload"]["generationConfig"]["maxOutputTokens"] == 88
+
+
+def test_configured_gateway_registers_gemini_when_server_credentials_exist(monkeypatch):
+    from ajusta_core.models import create_configured_model_gateway
+
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-secret")
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-test")
+    monkeypatch.setenv("AJUSTA_MODEL_PROVIDER_ORDER", "gemini,openai")
+
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-secret")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+
+    gateway = create_configured_model_gateway()
+    assert [provider.name for provider in gateway._providers] == ["gemini", "openai"]

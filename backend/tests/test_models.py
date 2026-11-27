@@ -246,3 +246,149 @@ def test_default_gateway_requires_server_environment_configuration(monkeypatch):
 
     with pytest.raises(ValueError, match="API key"):
         create_default_model_gateway()
+
+
+def test_xai_provider_uses_responses_compatible_endpoint_and_server_key():
+    import json
+    from ajusta_core.models import XAIResponsesProvider
+
+    captured = {}
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"output": [{
+                "type": "message",
+                "content": [{"type": "output_text", "text": "Grok answer"}],
+            }]}).encode()
+
+    def transport(request, timeout):
+        captured["url"] = request.full_url
+        captured["auth"] = request.get_header("Authorization")
+        captured["payload"] = json.loads(request.data.decode())
+        return FakeResponse()
+
+    provider = XAIResponsesProvider(
+        api_key="xai-secret", model="grok-test", transport=transport
+    )
+    result = provider.generate(ModelRequest(prompt="Hello"))
+
+    assert result.provider == "xai"
+    assert result.model == "grok-test"
+    assert result.text == "Grok answer"
+    assert captured["url"] == "https://api.x.ai/v1/responses"
+    assert captured["auth"] == "Bearer xai-secret"
+
+
+def test_deepseek_provider_uses_responses_compatible_endpoint():
+    import json
+    from ajusta_core.models import DeepSeekResponsesProvider
+
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({"output": [{
+                "type": "message",
+                "content": [{"type": "output_text", "text": "DeepSeek answer"}],
+            }]}).encode()
+
+    captured = {}
+    def transport(request, timeout):
+        captured["url"] = request.full_url
+        return FakeResponse()
+
+    provider = DeepSeekResponsesProvider(
+        api_key="deepseek-secret", model="deepseek-test", transport=transport
+    )
+    result = provider.generate(ModelRequest(prompt="Hello"))
+
+    assert result.provider == "deepseek"
+    assert result.text == "DeepSeek answer"
+    assert captured["url"] == "https://api.deepseek.com/responses"
+
+
+def test_anthropic_provider_sends_messages_request_and_extracts_text():
+    import json
+    from ajusta_core.models import AnthropicMessagesProvider
+
+    captured = {}
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def read(self):
+            return json.dumps({
+                "content": [
+                    {"type": "thinking", "thinking": "hidden"},
+                    {"type": "text", "text": "Claude answer"},
+                ],
+            }).encode()
+
+    def transport(request, timeout):
+        captured["url"] = request.full_url
+        captured["key"] = request.get_header("X-api-key")
+        captured["version"] = request.get_header("Anthropic-version")
+        captured["payload"] = json.loads(request.data.decode())
+        return FakeResponse()
+
+    provider = AnthropicMessagesProvider(
+        api_key="anthropic-secret", model="claude-test", transport=transport
+    )
+    result = provider.generate(ModelRequest(
+        prompt="Hello", system_prompt="Be clear", max_output_tokens=91
+    ))
+
+    assert result.provider == "anthropic"
+    assert result.model == "claude-test"
+    assert result.text == "Claude answer"
+    assert captured["url"] == "https://api.anthropic.com/v1/messages"
+    assert captured["key"] == "anthropic-secret"
+    assert captured["version"] == "2023-06-01"
+    assert captured["payload"]["system"] == "Be clear"
+    assert captured["payload"]["messages"] == [{"role": "user", "content": "Hello"}]
+    assert captured["payload"]["max_tokens"] == 91
+
+
+def test_configured_gateway_registers_only_providers_with_server_credentials(monkeypatch):
+    from ajusta_core.models import create_configured_model_gateway
+
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-secret")
+    monkeypatch.setenv("OPENAI_MODEL", "gpt-test")
+    monkeypatch.setenv("XAI_API_KEY", "xai-secret")
+    monkeypatch.setenv("XAI_MODEL", "grok-test")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "deepseek-secret")
+    monkeypatch.setenv("DEEPSEEK_MODEL", "deepseek-test")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-secret")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-test")
+
+    gateway = create_configured_model_gateway()
+    assert [provider.name for provider in gateway._providers] == [
+        "openai", "anthropic", "xai", "deepseek"
+    ]
+
+
+def test_configured_gateway_requires_at_least_one_provider(monkeypatch):
+    from ajusta_core.models import create_configured_model_gateway
+
+    for key in (
+        "OPENAI_API_KEY", "OPENAI_MODEL", "ANTHROPIC_API_KEY",
+        "ANTHROPIC_MODEL", "XAI_API_KEY", "XAI_MODEL",
+        "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
+    with pytest.raises(ValueError, match="at least one"):
+        create_configured_model_gateway()

@@ -62,3 +62,27 @@ def test_task_store_rejects_result_for_unknown_task(tmp_path):
 
     with pytest.raises(KeyError, match="does not exist"):
         store.save_result(result)
+
+
+def test_task_store_lists_recent_tasks_with_owner_isolation_and_limit(tmp_path):
+    store = SQLiteTaskStore(tmp_path / "ajusta.sqlite3")
+    store.create_task("one-old", TaskRequest("Old request"), user_id="user-one")
+    store.save_result(TaskResult("one-old", TaskStatus.SUCCEEDED, result="old result"))
+    store.create_task("one-new", TaskRequest("New request"), user_id="user-one")
+    store.create_task("two-private", TaskRequest("Other user's request"), user_id="user-two")
+
+    listed = store.list_tasks(user_id="user-one", limit=1)
+
+    assert len(listed) == 1
+    assert listed[0].task_id == "one-new"
+    assert listed[0].user_id == "user-one"
+
+
+def test_task_store_lists_service_owned_tasks_separately(tmp_path):
+    store = SQLiteTaskStore(tmp_path / "ajusta.sqlite3")
+    store.create_task("service-task", TaskRequest("Service request"))
+    store.create_task("user-task", TaskRequest("User request"), user_id="user-one")
+
+    listed = store.list_tasks(limit=10)
+
+    assert [item.task_id for item in listed] == ["service-task"]

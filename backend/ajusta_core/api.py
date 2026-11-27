@@ -274,6 +274,25 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
             "execution_started": False,
         }
 
+    @app.get("/v1/tasks")
+    def list_tasks(
+        limit: int = Query(default=20, ge=1, le=100),
+        user=Depends(identity),
+    ):
+        """Return recent tasks belonging only to the authenticated owner."""
+        items = service.list_tasks(user_id=user.user_id if user else None, limit=limit)
+        return {"items": [
+            {
+                "task_id": item.task_id,
+                "status": item.status.value,
+                "result": item.result,
+                "evidence": list(item.evidence),
+                "error_code": item.error_code,
+                "error_message": item.error_message,
+            }
+            for item in items
+        ]}
+
     @app.post("/v1/tasks", response_model=TaskResponse, status_code=201)
     def submit_task(body: TaskSubmission, user=Depends(identity)):
         try:

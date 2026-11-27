@@ -15,7 +15,7 @@ from .models import create_configured_model_gateway
 from .research import TavilySearchProvider
 from .service import TaskExecutionService
 from .skill_store import SQLiteSkillStore
-from .skills import SkillManifest, SkillStatus
+from .skills import SkillManifest
 from .skill_execution import SQLiteSkillAuditStore, SkillExecutionEngine
 from .knowledge_store import SQLiteKnowledgeStore
 from .storage import SQLiteTaskStore

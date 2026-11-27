@@ -31,7 +31,7 @@ def plan_request(request: str, departments=DEFAULT_DEPARTMENTS) -> TaskPlan:
     """Create a bounded plan from text. Routing is keyword-based and explainable."""
     if not isinstance(request, str):
         raise TypeError("request must be a string")
-    objective = re.sub(r"\\s+", " ", request).strip()
+    objective = " ".join(request.split())
     if not objective:
         raise ValueError("request must not be empty")
     if len(objective) > 4000:
@@ -40,7 +40,7 @@ def plan_request(request: str, departments=DEFAULT_DEPARTMENTS) -> TaskPlan:
     normalized = objective.casefold()
     selected = tuple(
         dept.name for dept in departments
-        if any(re.search(r"(?<!\\w)" + re.escape(word) + r"(?!\\w)", normalized) for word in dept.keywords)
+        if any(re.search(r"(?<![a-z0-9_])" + re.escape(word) + r"(?![a-z0-9_])", normalized) for word in dept.keywords)
     )
     if not selected:
         selected = ("research",)

@@ -158,6 +158,8 @@ class SkillExecutionEngine:
             raise SkillExecutionDenied("an authenticated user is required")
         if not isinstance(inputs, dict):
             raise SkillValidationError("skill inputs must be an object")
+        if any(key.startswith("_ajusta_") for key in inputs):
+            raise SkillValidationError("input contains a reserved AJUSTA context field")
         if not isinstance(granted_permissions, (set, frozenset)):
             raise TypeError("granted_permissions must be a set or frozenset")
 
@@ -177,7 +179,9 @@ class SkillExecutionEngine:
 
         execution_id = uuid4().hex
         try:
-            output = operation(dict(inputs))
+            operation_inputs = dict(inputs)
+            operation_inputs["_ajusta_user_id"] = user_id
+            output = operation(operation_inputs)
             # Ensure results are JSON-safe and bounded before exposing or auditing them.
             encoded = json.dumps(output, ensure_ascii=False, allow_nan=False)
             if len(encoded) > 100_000:

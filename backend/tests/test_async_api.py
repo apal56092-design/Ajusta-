@@ -96,7 +96,7 @@ def test_running_async_cancel_returns_request_and_status_is_visible(tmp_path):
     headers = {"Authorization": f"Bearer {token}"}
     body = {"task_id": "running-cancel", "instruction": "Research solar power"}
     assert client.post("/v1/tasks/async", headers=headers, json=body).status_code == 202
-    queue = client.app.state.task_queue
+    queue = worker._queue
     claimed = queue.claim_next("manual-worker", lease_seconds=30)
 
     response = client.delete("/v1/tasks/async/running-cancel", headers=headers)

@@ -9,26 +9,27 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] SQLite-backed durable task request/result storage foundation
 - [ ] Persistent skill catalog, schema migrations and dependency-aware planner
 - [ ] Bounded concurrency, durable execution queue, idempotency and cancellation
-- [x] Versioned authenticated task API scaffold (shared service token only)
+- [x] FastAPI task API with both private service-token mode and user-session mode
 
 ## B. Security and identity
 - [x] SQLite account/session primitives: normalized unique email, PBKDF2 password verifier, opaque random session token, token-hash persistence, expiry and revocation
-- [ ] Wire user registration/login/logout and session authentication into FastAPI
-- [ ] Enforce per-user task ownership and tenant/object isolation
-- [ ] Rate limiting, abuse protection, account recovery and session/device management
+- [x] User registration, login, logout and current-user API routes
+- [x] Per-user task ownership isolation in SQLite task reads and writes
+- [x] Android session token encrypted with AES-GCM using Android Keystore
+- [ ] Login abuse protection, rate limits, account recovery, email verification, MFA and session/device management
 - [ ] Permission scopes, approval inbox, audit events, secret manager and credential rotation
 - [ ] Threat model, independent security review and remediation
 
 ## C. AI providers and routing
 - [x] Provider-neutral model adapter and bounded request/response contract
-- [x] OpenAI Responses, Anthropic Messages, xAI Grok Responses and DeepSeek Responses adapters (mocked contract tests only)
+- [x] OpenAI Responses, Anthropic Messages, xAI Grok Responses and DeepSeek adapters (mocked contract tests only)
 - [x] Configurable provider registration and transient-unavailability fallback
 - [ ] Live provider verification, capability-aware routing, budgets, quotas, retries and cost reporting
 - [ ] Emergency provider disable and user consent for external processing
 
 ## D. Skills and departments
-- [x] Six model-backed text departments registered in the Brain (no external tools)
-- [ ] Research department with source retrieval, citations, freshness and provenance
+- [x] Six model-backed departments registered in the Brain
+- [x] Optional Tavily search adapter for Research, with bounded results, HTTPS source validation, untrusted-excerpt handling and source list
 - [ ] Coding department with isolated sandbox and test execution
 - [ ] Persistent skills, isolated execution, permissions, resource limits, review, evaluation and rollback
 - [ ] Real specialist workflows for design, data, business, writing and productivity
@@ -38,12 +39,14 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Document ingestion, indexing, retrieval, provenance and access filtering
 - [ ] User-controlled memory inspection, correction, export and deletion
 - [ ] Retention across indexes, caches and backups
-- [ ] Encryption, backups, restoration and capacity/cost dashboard
+- [ ] Encryption-at-rest, backups, restoration and capacity/cost dashboard
 
 ## F. Android and user experience
-- [x] Kotlin Android Jetpack Compose app skeleton and APK build workflow
-- [ ] Secure API client and user-scoped sign-in/register/logout
-- [ ] Unified chat, projects, attachments, task plan/progress/cancellation/results
+- [x] Kotlin Android Jetpack Compose app and CI debug APK build
+- [x] Registration/login, current-session validation, logout and task submission client
+- [x] HTTPS-only API client and Keystore-backed encrypted session persistence
+- [ ] Configure real HTTPS backend domain and verify live Android-to-API-to-Brain workflow
+- [ ] Unified chat history, projects, attachments, task plan/progress/cancellation/results
 - [ ] Approval inbox, skills catalog, permissions, storage/usage/privacy dashboard
 - [ ] Hindi/English localization and accessibility
 
@@ -66,15 +69,17 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Security review, gradual release, monitoring, rollback and support
 
 ## Current implementation status
-AJUSTA has a real but early backend foundation: task contracts, planner/orchestrator, Brain dispatcher, model adapters, synchronous task service, SQLite task persistence, a shared-token FastAPI API, and account/session storage primitives. Android is a Compose starter shell with a CI APK build. The account/session primitives are not yet connected to the API or task ownership. No live model credentials, external research, code sandbox, autonomous learning loop, complete storage system or production deployment have been verified. This is not 100% complete.
+AJUSTA now has a user-session FastAPI mode with registration/login/logout/current-user routes and per-user task isolation. The Android client has login/register, session validation, logout, task submission, HTTPS-only transport and Keystore-backed token encryption. The Android debug APK CI workflow passed after these integration changes. The backend has an optional Tavily search adapter that can be injected into the Research department; it has mocked contract tests, not a live Tavily credential verification. No real public API domain, model credentials, Tavily key, production deployment, code sandbox, autonomous learning loop, complete storage system or live end-to-end mobile workflow has been verified. This is not 100% complete.
 
 ## J. End-to-end capability targets
 - [x] Model adapters and mocked provider contract tests
 - [x] Synchronous task execution and persisted terminal results
-- [x] Native Android app scaffold and successful debug APK CI build
-- [ ] Per-user authenticated end-to-end Android-to-Brain workflow
-- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
+- [x] User-scoped task API and ownership isolation
+- [x] Native Android login/task client and successful debug APK build
+- [x] Optional source-backed Research handler with Tavily search adapter
+- [ ] Per-user authenticated live Android-to-Brain workflow against a deployed HTTPS API
+- [ ] Central Brain with model routing, dependency graphs, progress, cancellation and result evaluation
 - [ ] Secure Skill Execution Engine with isolation, permissions, resource limits, audit, approval and rollback
 - [ ] Complete multi-user database, adaptive storage, backups and restore
-- [ ] Research and learning engine with provenance and reviewed improvements
+- [ ] Reviewed learning engine and persistent skill catalog
 - [ ] Real department integrations and evidence-backed end-to-end acceptance tests

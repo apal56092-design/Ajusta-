@@ -60,6 +60,9 @@ def test_async_task_is_queued_then_executed_and_owner_scoped(tmp_path):
     assert finished.status_code == 200
     assert finished.json()["status"] == "succeeded"
     assert "research done" in finished.json()["result"]
+    assert finished.json()["progress_percent"] == 100
+    assert finished.json()["progress_message"] == "Task completed"
+    assert [event["progress_percent"] for event in finished.json()["progress_events"]] == [0, 5, 10, 95, 100]
 
 
 def test_async_task_requires_user_session_and_hides_other_owners(tmp_path):

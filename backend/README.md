@@ -20,6 +20,22 @@ AJUSTA is an evolving modular AI system, not yet a production-ready autonomous a
 - **FastAPI:** register/login/logout/current-user endpoints in user-session mode, and task submission/read with per-user task ownership isolation. A legacy shared-token mode remains for private controlled testing only.
 - **Skills:** declarative manifests and an in-memory lifecycle registry; generated skills are not executed.
 
+
+## Start a configured backend
+
+The runtime factory composes the model gateway, all six departments, optional Tavily Research, task persistence and user-session auth:
+
+```python
+from ajusta_core import create_runtime_app
+
+app = create_runtime_app(
+    database_path="/var/lib/ajusta/ajusta.sqlite3",
+    auth_database_path="/var/lib/ajusta/identity.sqlite3",
+)
+```
+
+Provide at least one model provider key and model name as server-side environment variables (for example `OPENAI_API_KEY` and `OPENAI_MODEL`). Add `TAVILY_API_KEY` to enable web search for the Research department. Never commit these secrets. The factory does not configure TLS, a public domain, reverse proxy, backups, rate limiting or deployment hosting.
+
 ## API usage
 
 Create an account/session store and pass it to the app factory:

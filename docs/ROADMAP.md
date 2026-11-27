@@ -13,7 +13,8 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Built-in private knowledge-search skill with authenticated-user isolation
 - [x] Optional source-provenance research-search skill when a search provider is configured
 - [ ] Versioned schema migrations and dependency-aware planner
-- [ ] Bounded concurrency, durable execution queue, idempotency and cancellation
+- [ ] Bounded concurrency, active background worker lifecycle, task/result synchronization and cooperative cancellation
+- [x] Durable SQLite queue primitives: atomic claims, expiring leases, bounded retries and owner-checked queued cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
 - [x] Bounded, authenticated, per-user task history endpoint with owner isolation
 - [x] Runtime factory composes model gateway, departments, persistence and user authentication

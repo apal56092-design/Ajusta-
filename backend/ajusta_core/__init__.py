@@ -1,4 +1,5 @@
-"""AJUSTA core: planning, brain dispatch, contracts, policy, storage and skills."""
+"""AJUSTA core: planning, brain dispatch, auth, contracts, policy, storage and skills."""
+from .auth import AuthenticationError, AuthenticatedUser, SQLiteAuthStore
 from .brain import BrainExecutionReport, DepartmentHandler, DepartmentRegistry, ModelDepartmentHandler, execute_plan, register_model_departments
 from .contracts import ContractValidationError, TaskRequest, TaskResult, TaskStatus
 from .orchestrator import ExecutionPlan, build_execution_plan
@@ -18,6 +19,7 @@ from .service import TaskExecutionService
 from .api import create_app
 
 __all__ = [
+    "AuthenticationError", "AuthenticatedUser", "SQLiteAuthStore",
     "BrainExecutionReport", "DepartmentHandler", "DepartmentRegistry", "ModelDepartmentHandler", "execute_plan", "register_model_departments",
     "ContractValidationError", "TaskRequest", "TaskResult", "TaskStatus",
     "ExecutionPlan", "build_execution_plan", "Department", "TaskPlan", "plan_request",

@@ -49,3 +49,38 @@ def test_brain_rejects_invalid_department_output():
 
     with pytest.raises(ValueError, match="non-empty string"):
         execute_plan(plan, registry)
+
+
+def test_model_department_handler_uses_gateway_and_returns_department_result():
+    from ajusta_core.brain import ModelDepartmentHandler
+    from ajusta_core.models import ModelResponse
+
+    class FakeGateway:
+        def __init__(self):
+            self.request = None
+
+        def generate(self, request):
+            self.request = request
+            return ModelResponse(provider="fake", model="unit-test", text="Evidence summary")
+
+    gateway = FakeGateway()
+    handler = ModelDepartmentHandler(
+        name="research",
+        gateway=gateway,
+        system_prompt="You are the research department. Be careful with evidence.",
+    )
+
+    result = handler.execute("Investigate solar power", ("Find evidence", "Summarize"))
+
+    assert result == "Evidence summary"
+    assert gateway.request.prompt.startswith("Department: research")
+    assert "Investigate solar power" in gateway.request.prompt
+    assert "Find evidence" in gateway.request.prompt
+    assert gateway.request.system_prompt.startswith("You are the research department")
+
+
+def test_model_department_handler_rejects_invalid_department_name():
+    from ajusta_core.brain import ModelDepartmentHandler
+
+    with pytest.raises(ValueError, match="name"):
+        ModelDepartmentHandler(name="../unsafe", gateway=object())

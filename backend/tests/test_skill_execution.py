@@ -81,3 +81,14 @@ def test_validates_inputs_and_outputs(tmp_path):
     with pytest.raises(ValueError, match="missing required fields"):
         engine2.execute(name="safe_lookup", version="1.0.0", user_id="u",
                         inputs={"term": "x"}, granted_permissions={"knowledge.read"})
+
+
+def test_caller_cannot_spoof_internal_user_context(tmp_path):
+    engine, _ = make_engine(tmp_path)
+    engine.register_operation("safe_lookup", "1.0.0", lambda data: {"result": "ok"})
+    with pytest.raises(ValueError, match="reserved AJUSTA context"):
+        engine.execute(
+            name="safe_lookup", version="1.0.0", user_id="real-user",
+            inputs={"term": "x", "_ajusta_user_id": "other-user"},
+            granted_permissions={"knowledge.read"},
+        )

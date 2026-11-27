@@ -18,10 +18,11 @@ from .storage import SQLiteTaskStore, StoredTask
 from .service import TaskExecutionService
 from .api import create_app
 from .research import ResearchDepartmentHandler, ResearchSource, TavilySearchProvider
+from .runtime import create_runtime_app
 
 __all__ = [
     "AuthenticationError", "AuthenticatedUser", "SQLiteAuthStore",
-    "ResearchDepartmentHandler", "ResearchSource", "TavilySearchProvider",
+    "ResearchDepartmentHandler", "ResearchSource", "TavilySearchProvider", "create_runtime_app",
     "BrainExecutionReport", "DepartmentHandler", "DepartmentRegistry", "ModelDepartmentHandler", "execute_plan", "register_model_departments",
     "ContractValidationError", "TaskRequest", "TaskResult", "TaskStatus",
     "ExecutionPlan", "build_execution_plan", "Department", "TaskPlan", "plan_request",

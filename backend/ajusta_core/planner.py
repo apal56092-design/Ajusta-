@@ -1,4 +1,4 @@
-"""Deterministic request planner; no external AI or tools are called here."""
+"""Deterministic, explainable request planner; no external AI or tools are called."""
 from dataclasses import dataclass
 import re
 
@@ -15,6 +15,9 @@ class TaskPlan:
     departments: tuple[str, ...]
     steps: tuple[str, ...]
     status: str = "planned"
+    routing_reasons: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    confidence: float = 0.1
+    used_fallback: bool = False
 
 
 DEFAULT_DEPARTMENTS = (
@@ -28,7 +31,11 @@ DEFAULT_DEPARTMENTS = (
 
 
 def plan_request(request: str, departments=DEFAULT_DEPARTMENTS) -> TaskPlan:
-    """Create a bounded plan from text. Routing is keyword-based and explainable."""
+    """Route using exact keyword boundaries and explain every selected specialist.
+
+    Confidence is a transparent routing heuristic, not a calibrated probability
+    that the plan is correct. Unknown requests fall back to research explicitly.
+    """
     if not isinstance(request, str):
         raise TypeError("request must be a string")
     objective = " ".join(request.split())
@@ -38,16 +45,32 @@ def plan_request(request: str, departments=DEFAULT_DEPARTMENTS) -> TaskPlan:
         raise ValueError("request exceeds the 4000-character limit")
 
     normalized = objective.casefold()
-    selected = tuple(
-        dept.name for dept in departments
-        if any(re.search(r"(?<![a-z0-9_])" + re.escape(word) + r"(?![a-z0-9_])", normalized) for word in dept.keywords)
-    )
-    if not selected:
-        selected = ("research",)
+    reasons = []
+    for dept in departments:
+        matches = tuple(
+            word for word in dept.keywords
+            if re.search(r"(?<![a-z0-9_])" + re.escape(word) + r"(?![a-z0-9_])", normalized)
+        )
+        if matches:
+            reasons.append((dept.name, matches))
+
+    used_fallback = not reasons
+    if used_fallback:
+        reasons = [("research", ())]
+    selected = tuple(name for name, _ in reasons)
+    matched_count = sum(len(words) for _, words in reasons)
+    confidence = 0.1 if used_fallback else min(0.95, 0.55 + 0.1 * matched_count)
     steps = (
         "clarify_objective_and_constraints",
         "route_to_authorized_specialists",
         "collect_and_validate_results",
         "summarize_outcome_and_uncertainty",
     )
-    return TaskPlan(objective=objective, departments=selected, steps=steps)
+    return TaskPlan(
+        objective=objective,
+        departments=selected,
+        steps=steps,
+        routing_reasons=tuple(reasons),
+        confidence=round(confidence, 2),
+        used_fallback=used_fallback,
+    )

@@ -3,8 +3,10 @@
 This roadmap combines the capability vision with product, security, infrastructure and operations requirements. A checkbox is complete only when implementation and verification evidence exist.
 
 ## A. Foundation and central brain
-- [ ] Typed request, task, result and error contracts
-- [ ] Department interface, skill manifest and registry
+- [x] Typed task request/result contracts and lifecycle statuses
+- [x] Initial department routing and central orchestration boundary
+- [x] Declarative skill manifest and in-memory registry lifecycle (draft/review/activate/disable)
+- [ ] Department execution interface and persistent skill catalog
 - [ ] Dependency-aware planner, bounded concurrency and cancellation
 - [ ] Structured task state, partial failures and idempotency
 - [ ] API versioning and generated API documentation
@@ -27,7 +29,6 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Research department with evidence provenance
 - [ ] Coding department with sandbox and test execution
 - [ ] Design, data, business, writing and productivity departments
-- [x] Declarative skill manifest and in-memory lifecycle registry (draft/review/activate/disable)
 - [ ] Persistent skill catalog with audit history
 - [ ] Isolated skill execution, dependency controls and resource limits
 - [ ] Skill authoring workflow, evaluation benchmarks and rollback
@@ -76,4 +77,4 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-The repository has an initial deterministic Python planner/orchestrator, approval-policy foundation, CI workflow definition and an in-memory declarative skill registry with a reviewed lifecycle. The registry does not execute code and is not a sandbox. All other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.
+The repository contains a deterministic Python planner/orchestrator, approval-policy foundation, typed task contracts, a declarative in-memory skill registry and a CI workflow definition. The registry does not execute code and is not a sandbox. Other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.

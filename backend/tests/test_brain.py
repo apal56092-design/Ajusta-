@@ -84,3 +84,48 @@ def test_model_department_handler_rejects_invalid_department_name():
 
     with pytest.raises(ValueError, match="name"):
         ModelDepartmentHandler(name="../unsafe", gateway=object())
+
+
+def test_register_model_departments_installs_all_default_specialists():
+    from ajusta_core.brain import register_model_departments
+    from ajusta_core.models import ModelResponse
+
+    class FakeGateway:
+        def generate(self, request):
+            department = request.prompt.splitlines()[0].split(": ", 1)[1]
+            return ModelResponse(
+                provider="fake",
+                model="test-model",
+                text=f"{department} completed its analysis",
+            )
+
+    registry = DepartmentRegistry()
+    names = register_model_departments(registry, FakeGateway())
+
+    assert names == ("research", "coding", "design", "data", "business", "automation")
+    assert all(registry.get(name) is not None for name in names)
+
+    plan = ExecutionPlan(
+        objective="Plan an app and analyze its data",
+        departments=("coding", "data"),
+        disabled_departments=(),
+        steps=("Describe a safe approach",),
+    )
+    report = execute_plan(plan, registry)
+
+    assert report.status == "completed"
+    assert report.unavailable_departments == ()
+    assert report.department_results == (
+        ("coding", "coding completed its analysis"),
+        ("data", "data completed its analysis"),
+    )
+
+
+def test_register_model_departments_rejects_existing_registry_conflicts():
+    from ajusta_core.brain import register_model_departments
+
+    registry = DepartmentRegistry()
+    registry.register(EchoDepartment())
+
+    with pytest.raises(ValueError, match="already registered"):
+        register_model_departments(registry, object())

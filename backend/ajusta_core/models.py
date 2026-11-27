@@ -1,10 +1,22 @@
-"""Provider-neutral model gateway with explicit allow-list and safe fallback rules."""
+"""Provider-neutral model gateway and concrete OpenAI Responses API adapter."""
 from dataclasses import dataclass
-from typing import Protocol
+import json
+import os
+from typing import Callable, Protocol
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 
 class ModelUnavailableError(RuntimeError):
-    """Raised when a model provider cannot serve a request."""
+    """Raised when a model provider cannot serve a request temporarily."""
+
+
+class ModelAuthenticationError(RuntimeError):
+    """Raised when provider credentials are missing, invalid, or unauthorized."""
+
+
+class ModelRequestError(RuntimeError):
+    """Raised when a provider rejects a request for a non-transient reason."""
 
 
 @dataclass(frozen=True)
@@ -39,7 +51,106 @@ class ModelProvider(Protocol):
     name: str
 
     def generate(self, request: ModelRequest) -> ModelResponse:
-        """Generate one response or raise ModelUnavailableError for transient unavailability."""
+        """Generate one response or raise a typed provider error."""
+
+
+Transport = Callable[[Request, float], object]
+
+
+class OpenAIResponsesProvider:
+    """Calls the OpenAI Responses API using a server-side API key.
+
+    No SDK dependency is required. Tests can inject a transport; production uses
+    urllib with a finite timeout. API keys must never be placed in client apps.
+    """
+
+    name = "openai"
+    endpoint = "https://api.openai.com/v1/responses"
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        model: str | None = None,
+        timeout: float = 30.0,
+        transport: Transport | None = None,
+    ) -> None:
+        key = api_key if api_key is not None else os.getenv("OPENAI_API_KEY")
+        selected_model = model if model is not None else os.getenv("OPENAI_MODEL", "")
+        if not isinstance(key, str) or not key.strip():
+            raise ValueError("OpenAI API key is required via server-side configuration")
+        if not isinstance(selected_model, str) or not selected_model.strip():
+            raise ValueError("OpenAI model name is required")
+        if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise ValueError("timeout must be a positive number")
+        self._api_key = key.strip()
+        self.model = selected_model.strip()
+        self.timeout = float(timeout)
+        self._transport = transport or (lambda request, seconds: urlopen(request, timeout=seconds))
+
+    def generate(self, request: ModelRequest) -> ModelResponse:
+        if not isinstance(request, ModelRequest):
+            raise TypeError("request must be a ModelRequest")
+        payload: dict[str, object] = {
+            "model": self.model,
+            "input": request.prompt,
+            "max_output_tokens": request.max_output_tokens,
+        }
+        if request.system_prompt:
+            payload["instructions"] = request.system_prompt
+
+        http_request = Request(
+            self.endpoint,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            response = self._transport(http_request, self.timeout)
+            with response:
+                body = response.read()
+        except HTTPError as exc:
+            if exc.code in (401, 403):
+                raise ModelAuthenticationError("OpenAI authentication failed") from None
+            if exc.code == 429 or exc.code == 408 or exc.code >= 500:
+                raise ModelUnavailableError(
+                    f"OpenAI temporarily unavailable (HTTP {exc.code})"
+                ) from None
+            raise ModelRequestError(
+                f"OpenAI rejected the request (HTTP {exc.code})"
+            ) from None
+        except (URLError, TimeoutError, OSError):
+            raise ModelUnavailableError("OpenAI network request failed or timed out") from None
+
+        try:
+            data = json.loads(body.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            raise ValueError("OpenAI returned malformed JSON") from None
+        if not isinstance(data, dict):
+            raise ValueError("OpenAI returned an invalid response object")
+
+        text_parts: list[str] = []
+        output = data.get("output")
+        if isinstance(output, list):
+            for item in output:
+                if not isinstance(item, dict) or item.get("type") != "message":
+                    continue
+                content = item.get("content")
+                if not isinstance(content, list):
+                    continue
+                for part in content:
+                    if (
+                        isinstance(part, dict)
+                        and part.get("type") == "output_text"
+                        and isinstance(part.get("text"), str)
+                    ):
+                        text_parts.append(part["text"])
+        answer = "\\n".join(part for part in text_parts if part.strip()).strip()
+        if not answer:
+            raise ValueError("OpenAI response contains no output text")
+        return ModelResponse(provider=self.name, model=self.model, text=answer)
 
 
 class ModelGateway:

@@ -82,7 +82,7 @@ Implemented foundations: deterministic planner/orchestrator, approval-policy fou
 
 ## J. End-to-end capability targets
 - [x] OpenAI Responses API adapter with server-side environment-secret boundary and mocked contract tests\n- [ ] Live provider integration test with deployment-managed credentials
-- [x] Model-backed department-handler bridge into the central Brain (single bounded model request; no tool execution)\n- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
+- [x] Model-backed department-handler bridge into the central Brain (single bounded model request; no tool execution)\n- [x] Synchronous task path joining persistent task records, planning, approval checks, Brain dispatch and result persistence\n- [ ] Central AI Brain with model routing, dependency graphs, progress, cancellation and result evaluation
 - [ ] Secure Skill Execution Engine with isolation, permissions, resource limits, audit, approval and rollback
 - [ ] Complete persistent database for identity, tasks, skills, permissions and audit history
 - [ ] Adaptive object/file storage with capacity, cost, backup and restore controls

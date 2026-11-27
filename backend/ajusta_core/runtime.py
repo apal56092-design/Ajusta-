@@ -173,7 +173,9 @@ def create_runtime_app(
             constraints=tuple(payload.get("constraints", ())),
             output_format=payload.get("output_format", "text"),
         )
-        service.submit(item.task_id, request, user_id=item.owner_id)
+        result = service.submit(item.task_id, request, user_id=item.owner_id)
+        if result.status.value == "failed":
+            raise RuntimeError("queued task execution failed")
 
     task_worker = DurableTaskWorker(task_queue, execute_queued_task)
     app = create_app(

@@ -7,7 +7,12 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [x] Initial department routing, central orchestration and allow-listed Brain dispatch
 - [x] Declarative skill manifest and in-memory registry lifecycle
 - [x] SQLite-backed durable task request/result storage foundation
-- [x] Persistent SQLite skill catalog with versioned manifests and reviewed lifecycle state\n- [ ] Versioned schema migrations and dependency-aware planner
+- [x] Persistent SQLite skill catalog with versioned manifests and reviewed lifecycle state
+- [x] Governed skill execution for host-registered operations, active-state checks, schema validation, server-resolved permission scopes, explicit approval for consequential scopes and minimal audit digests
+- [x] Authenticated skill execution API with fail-closed permission resolution
+- [x] Built-in private knowledge-search skill with authenticated-user isolation
+- [x] Optional source-provenance research-search skill when a search provider is configured
+- [ ] Versioned schema migrations and dependency-aware planner
 - [ ] Bounded concurrency, durable execution queue, idempotency and cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
 - [x] Runtime factory composes model gateway, departments, persistence and user authentication

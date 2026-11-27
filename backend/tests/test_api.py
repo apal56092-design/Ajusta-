@@ -338,3 +338,32 @@ def test_skill_execution_api_fails_closed_without_permission_resolver(tmp_path):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 503
+
+
+def test_task_history_api_returns_only_authenticated_users_tasks(tmp_path):
+    from ajusta_core.auth import SQLiteAuthStore
+
+    auth = SQLiteAuthStore(tmp_path / "auth.sqlite3")
+    auth.register_user("history-one@example.com", "long-password-one")
+    auth.register_user("history-two@example.com", "long-password-two")
+    one_user = auth.authenticate("history-one@example.com", "long-password-one")
+    two_user = auth.authenticate("history-two@example.com", "long-password-two")
+    one_token = auth.create_session(one_user.user_id)
+    two_token = auth.create_session(two_user.user_id)
+
+    registry = DepartmentRegistry()
+    register_model_departments(registry, DeterministicGateway())
+    store = SQLiteTaskStore(tmp_path / "tasks.sqlite3")
+    service = TaskExecutionService(store=store, registry=registry, enabled_departments={"research"})
+    client = TestClient(create_app(service, auth_store=auth))
+    client.post("/v1/tasks", headers={"Authorization": f"Bearer {one_token}"},
+                json={"task_id": "one-task", "instruction": "Research my topic"})
+    client.post("/v1/tasks", headers={"Authorization": f"Bearer {two_token}"},
+                json={"task_id": "two-task", "instruction": "Research another topic"})
+
+    own = client.get("/v1/tasks?limit=10", headers={"Authorization": f"Bearer {one_token}"})
+    assert own.status_code == 200
+    assert [item["task_id"] for item in own.json()["items"]] == ["one-task"]
+
+    limited = client.get("/v1/tasks?limit=0", headers={"Authorization": f"Bearer {one_token}"})
+    assert limited.status_code == 422

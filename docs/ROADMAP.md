@@ -78,3 +78,17 @@ This roadmap combines the capability vision with product, security, infrastructu
 
 ## Current implementation status
 The repository contains a deterministic Python planner/orchestrator, approval-policy foundation, typed task contracts, a declarative in-memory skill registry and a CI workflow definition. The registry does not execute code and is not a sandbox. Other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.
+
+
+## J. Explicit end-to-end capability delivery
+These requirements expand the existing workstreams; they remain planned until implemented and verified.
+- [ ] Real AI model adapters connected to at least one selected provider, with secure server-side secrets and verified integration tests
+- [ ] Central AI Brain coordinating planning, dependency graphs, model routing, departments, skills, progress, cancellation and result evaluation
+- [ ] Secure Skill Execution Engine with isolated sandbox, permission scopes, resource limits, audit, approval, disable and rollback
+- [ ] Persistent database for identity, tasks, skills, permissions and audit history; durable file/object storage with configurable adapters
+- [ ] Adaptive storage policy based on data sensitivity, configured capacity, provider limits, availability and cost; backups and restore verification
+- [ ] Learning and Research Engine with source provenance, freshness, evidence evaluation and reviewed skill-improvement lifecycle
+- [ ] Complete authentication and server-enforced authorization across users, tenants, departments, skills, connectors and data
+- [ ] Native Kotlin Android app connected to authenticated APIs, with task workspace, approvals, skills, storage and privacy controls
+- [ ] Real execution implementations for every department, each with typed contracts, permissions, evidence and department-specific tests
+- [ ] End-to-end acceptance tests proving a user request can travel from Android/API through brain, model, department/skill, storage and verified result

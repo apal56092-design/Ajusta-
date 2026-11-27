@@ -124,3 +124,10 @@ class TaskExecutionService:
 
         self._store.save_result(result)
         return result
+
+
+    def get_task(self, task_id: str):
+        """Return a persisted task snapshot without exposing storage internals."""
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("task_id must be a non-empty string")
+        return self._store.get_task(task_id.strip())

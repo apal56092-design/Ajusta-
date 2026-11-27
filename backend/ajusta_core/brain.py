@@ -137,3 +137,63 @@ def execute_plan(
         department_results=tuple(results),
         unavailable_departments=tuple(unavailable),
     )
+
+
+_DEFAULT_DEPARTMENT_PROMPTS = {
+    "research": (
+        "You are AJUSTA Research. Analyze only the information supplied in the task. "
+        "Separate evidence, assumptions, and unknowns. Never claim live browsing or "
+        "source verification unless a research tool actually supplied it."
+    ),
+    "coding": (
+        "You are AJUSTA Coding. Explain the design, produce careful code when asked, "
+        "and include tests and limitations. Never claim code was run or tested unless "
+        "an execution tool actually ran it. Do not execute generated code."
+    ),
+    "design": (
+        "You are AJUSTA Design. Produce clear, accessible, usable design specifications. "
+        "State layout, interaction, accessibility, and implementation assumptions."
+    ),
+    "data": (
+        "You are AJUSTA Data. Analyze only supplied data, show methods and assumptions, "
+        "and never invent measurements, rows, calculations, or source provenance."
+    ),
+    "business": (
+        "You are AJUSTA Business. Build structured plans and scenarios, distinguish "
+        "facts from assumptions, and state uncertainty rather than inventing market data."
+    ),
+    "automation": (
+        "You are AJUSTA Automation. Design bounded workflows with explicit triggers, "
+        "permissions, approvals, and failure handling. Describe actions; do not execute them."
+    ),
+}
+
+
+def register_model_departments(
+    registry: DepartmentRegistry,
+    gateway: ModelGatewayLike,
+    *,
+    max_output_tokens: int = 2048,
+) -> tuple[str, ...]:
+    """Register the six default model-backed specialists in an explicit allow-list.
+
+    These specialists can reason over the prompt but have no browser, filesystem,
+    code-execution, or external-action tools until separately integrated and approved.
+    """
+    if not isinstance(registry, DepartmentRegistry):
+        raise TypeError("registry must be a DepartmentRegistry")
+    handlers = tuple(
+        ModelDepartmentHandler(
+            name=name,
+            gateway=gateway,
+            system_prompt=system_prompt,
+            max_output_tokens=max_output_tokens,
+        )
+        for name, system_prompt in _DEFAULT_DEPARTMENT_PROMPTS.items()
+    )
+    conflicts = tuple(handler.name for handler in handlers if registry.get(handler.name) is not None)
+    if conflicts:
+        raise ValueError("departments already registered: " + ", ".join(conflicts))
+    for handler in handlers:
+        registry.register(handler)
+    return tuple(handler.name for handler in handlers)

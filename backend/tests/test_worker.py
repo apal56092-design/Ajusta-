@@ -50,3 +50,20 @@ def test_worker_start_is_idempotent_and_stop_is_graceful(tmp_path):
     assert worker.is_running
     assert worker.stop(timeout=2) is True
     assert worker.is_running is False
+
+
+def test_handler_can_observe_and_cooperatively_stop_after_cancel_request(tmp_path):
+    queue = SQLiteTaskQueue(tmp_path / "cooperative.sqlite3")
+    queue.enqueue("cooperative-1", "owner-a", {"instruction": "Work"})
+
+    def handler(item, context):
+        assert context.cancellation_requested is False
+        assert queue.request_cancel(item.task_id, item.owner_id) == "requested"
+        context.raise_if_cancelled()
+
+    worker = DurableTaskWorker(queue, handler)
+    assert worker.run_once() is True
+    item = queue.get("cooperative-1", "owner-a")
+    assert item.status == "cancelled"
+    assert item.cancel_requested is False
+    assert item.progress_message == "Task cancelled cooperatively"

@@ -207,3 +207,33 @@ The repository contains a deterministic planner, a central orchestration API, a 
 Build a dependable, expandable AI ecosystem in which multiple specialized capabilities work together through one coordinated system.
 
 **AJUSTA — One System. Multiple Intelligences. Expanding Possibilities.**
+
+
+## Configuring live LLM providers
+
+AJUSTA includes server-side adapters for OpenAI Responses, Anthropic Messages,
+xAI Grok, DeepSeek Responses-compatible, and Google Gemini generateContent.
+Adapters are not the same as active credentials: a provider is registered only
+when both its API key and model name are configured on the backend.
+
+Supported environment variables:
+
+| Provider | API key | Model |
+|---|---|---|
+| OpenAI | `OPENAI_API_KEY` | `OPENAI_MODEL` |
+| Anthropic | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` |
+| xAI | `XAI_API_KEY` | `XAI_MODEL` |
+| DeepSeek | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` |
+| Google Gemini | `GEMINI_API_KEY` | `GEMINI_MODEL` |
+
+Set `AJUSTA_MODEL_PROVIDER_ORDER` to a comma-separated preference order,
+for example `gemini,openai,anthropic,xai,deepseek`. Fallback is attempted only
+when a provider is temporarily unavailable; authentication and request errors
+are surfaced rather than silently routed elsewhere. Keep all keys in a server
+secret manager or environment configuration. Never put provider keys in the
+Android app or commit them to this repository.
+
+No live provider connection is implied by adding an adapter. Live use requires
+valid provider credentials, an available model, network access, and provider
+billing/quota. The automated tests use an injected offline transport and do
+not validate live credentials or model quality.

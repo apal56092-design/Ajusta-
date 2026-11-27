@@ -1,36 +1,58 @@
 # AJUSTA Backend Foundation
 
-This is an evolving backend foundation for AJUSTA. It is not yet a production-ready autonomous agent.
+AJUSTA is an evolving modular AI system, not yet a production-ready autonomous agent.
 
-## Requirements
+## Setup
+
 - Python 3.11+
-- Install test extras: `python -m pip install -e '.[test]'`
+- Install: `python -m pip install -e '.[test]'`
+- Tests: `python -m pytest`
 
-## Run tests
-From this directory: `python -m pytest`
+## Implemented modules
 
-## Implemented foundation
-- Typed, validated task request/result contracts and lifecycle statuses.
-- Transparent keyword planner, central orchestrator, allow-listed Brain dispatcher and approval-policy boundary.
-- SQLite-backed durable task request/result store.
-- Provider-neutral model gateway and adapters for OpenAI Responses, Anthropic Messages, xAI Grok and DeepSeek; contract tests use mocked transports, not live credentials.
-- Six bounded model-backed text departments: research, coding, design, data, business and automation. These currently generate text only; they do not yet browse, execute code or control external apps.
-- Synchronous task service joining planning, approval checks, department dispatch and result persistence.
-- FastAPI task API scaffold with a shared server-side bearer token for controlled testing.
-- New account/session primitives in `ajusta_core.auth`: PBKDF2-HMAC-SHA256 password verifiers, normalized unique email accounts, opaque random session tokens, SHA-256 token-hash storage, expiry and revocation.
-- Declarative skill manifests and an in-memory skill lifecycle registry.
+- **Contracts and planner:** validated task request/result schemas, deterministic task planning and lifecycle states.
+- **Central Brain:** explicit department allow-list, orchestration and reviewed handler dispatch.
+- **Model gateway:** provider-neutral adapter plus OpenAI Responses, Anthropic Messages, xAI/Grok and DeepSeek adapters. Provider contract tests use mocked transports; live credentials/calls are not verified.
+- **Research engine:** optional Tavily search adapter, bounded query/result counts, HTTPS-only source records, evidence snippets passed as untrusted content to the model, and an appended source list. Configure `TAVILY_API_KEY` as a server-side secret and pass `TavilySearchProvider()` to `register_model_departments(..., research_search_provider=...)`. No arbitrary page URLs are fetched by this adapter.
+- **Other departments:** coding, design, data, business and automation currently provide model-backed text reasoning only. They do not execute code or control external apps.
+- **Task service and storage:** synchronous execution with SQLite task persistence and optional user ownership.
+- **User identity:** PBKDF2-HMAC-SHA256 password verifiers, normalized unique email accounts, opaque random sessions, hashed session-token persistence, expiry and revocation.
+- **FastAPI:** register/login/logout/current-user endpoints in user-session mode, and task submission/read with per-user task ownership isolation. A legacy shared-token mode remains for private controlled testing only.
+- **Skills:** declarative manifests and an in-memory lifecycle registry; generated skills are not executed.
 
-## Important integration and production gaps
-The account/session store is a tested backend primitive, **not yet wired into FastAPI routes or task ownership**. The current task API still uses a shared service token; do not expose it publicly or embed it in Android. Per-user task ownership, login/register/logout endpoints, rate limiting, account recovery, authorization scopes and audit events are still required.
+## API usage
 
-Provider adapters have not been verified against live accounts. Configure credentials only as server-side deployment secrets; never place them in Android, GitHub source or chat. No live provider call has been verified. Research does not yet browse or cite sources; coding does not execute in a sandbox; the skill registry does not run generated code; the learning pipeline, durable job queue, cancellation, streaming, adaptive file storage, backup/restore, observability and production deployment remain incomplete.
+Create an account/session store and pass it to the app factory:
 
-SQLite currently provides task and auth primitives, not a complete multi-tenant data model. There is no production migration system, encryption-at-rest, backup/restore or security review. The Android app is a Jetpack Compose scaffold and is not connected to the backend.
+```python
+from ajusta_core import SQLiteAuthStore, create_app
 
-## Android scaffold
-The native Android project lives in `../android` and uses Kotlin with Jetpack Compose. Build locally with Gradle 8.13 and JDK 17:
+auth_store = SQLiteAuthStore("/var/lib/ajusta/auth.sqlite3")
+app = create_app(task_service, auth_store=auth_store)
+```
+
+Set up your ASGI server and TLS termination in the deployment environment. Never embed server credentials or provider API keys in an Android APK. User-scoped API routes are ready for a configured backend, but this repository does not yet include a production deployment, public domain, or configured model provider secrets.
+
+## Android client
+
+The native Kotlin/Jetpack Compose client now includes registration/login, session validation, task submission and logout. Session tokens are encrypted using an AES-GCM key held in Android Keystore. Configure the backend base URL at build time:
 
 ```bash
 cd android
-gradle :app:assembleDebug
+gradle -PAJUSTA_API_BASE_URL=https://your-real-api-domain.example :app:assembleDebug
 ```
+
+The default URL is a non-routable placeholder and must be replaced with a real HTTPS deployment URL. Android CI only builds the app; it does not verify a live backend connection.
+
+## Remaining production work
+
+- Login abuse protection, rate limits, account recovery, email verification, MFA and security review.
+- Production database migrations, tenant lifecycle, encryption-at-rest, backup/restore and operational recovery.
+- Durable async job queue, cancellation, retries, streaming, idempotency and bounded concurrency.
+- Live provider verification, routing budgets, quotas, retries and cost reporting.
+- Coding sandbox, file execution, real specialist tools, persistent skills and controlled learning/review/rollback.
+- Document ingestion/indexing, user-controlled memory, adaptive object storage and retention.
+- Observability, load tests, threat model, privacy/legal review and deployment operations.
+- Android integration tests, real endpoint configuration, release signing and full end-to-end acceptance tests.
+
+AJUSTA is not 100% complete. A successful local/CI build or mocked provider test is not evidence of live production behavior.

@@ -364,6 +364,7 @@ def test_task_history_api_returns_only_authenticated_users_tasks(tmp_path):
     own = client.get("/v1/tasks?limit=10", headers={"Authorization": f"Bearer {one_token}"})
     assert own.status_code == 200
     assert [item["task_id"] for item in own.json()["items"]] == ["one-task"]
+    assert own.json()["items"][0]["instruction"] == "Research my topic"
 
     limited = client.get("/v1/tasks?limit=0", headers={"Authorization": f"Bearer {one_token}"})
     assert limited.status_code == 422

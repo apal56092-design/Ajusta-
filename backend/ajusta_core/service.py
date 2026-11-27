@@ -22,6 +22,11 @@ class TaskExecutionService:
         self._registry = registry
         self._enabled_departments = frozenset(enabled_departments)
 
+    @property
+    def enabled_departments(self) -> frozenset[str]:
+        """Return the immutable department allow-list used by the planner."""
+        return self._enabled_departments
+
     def submit(self, task_id: str, request: TaskRequest, *, action: Action | None = None,
                user_id: str | None = None) -> TaskResult:
         if not isinstance(request, TaskRequest):

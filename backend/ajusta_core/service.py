@@ -43,6 +43,9 @@ class TaskExecutionService:
         """Run one task and persist its terminal state before returning."""
         if not isinstance(request, TaskRequest):
             raise TypeError("request must be a TaskRequest")
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError("task_id must be a non-empty string")
+        task_id = task_id.strip()
         self._store.create_task(task_id, request)
         self._store.save_result(TaskResult(task_id, TaskStatus.RUNNING))
 

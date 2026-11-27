@@ -48,3 +48,17 @@ def test_task_store_returns_none_for_unknown_task(tmp_path):
     store = SQLiteTaskStore(tmp_path / "ajusta.sqlite3")
 
     assert store.get_task("missing") is None
+
+
+
+def test_task_store_requires_file_backed_database_for_durability():
+    with pytest.raises(ValueError, match="file-backed"):
+        SQLiteTaskStore(":memory:")
+
+
+def test_task_store_rejects_result_for_unknown_task(tmp_path):
+    store = SQLiteTaskStore(tmp_path / "ajusta.sqlite3")
+    result = TaskResult(task_id="unknown", status=TaskStatus.FAILED, error_code="NOT_FOUND")
+
+    with pytest.raises(KeyError, match="does not exist"):
+        store.save_result(result)

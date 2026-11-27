@@ -129,3 +129,24 @@ def test_register_model_departments_rejects_existing_registry_conflicts():
 
     with pytest.raises(ValueError, match="already registered"):
         register_model_departments(registry, object())
+
+
+def test_register_model_departments_uses_real_search_handler_when_configured():
+    from ajusta_core.brain import ResearchDepartmentHandler, register_model_departments
+    from ajusta_core.models import ModelResponse
+    from ajusta_core.research import ResearchSource
+
+    class FakeGateway:
+        def generate(self, request):
+            return ModelResponse(provider="fake", model="test", text="Synthesis [1].")
+
+    class FakeSearch:
+        def search(self, query, *, max_results=5):
+            return (ResearchSource("Source", "https://example.org/source", "Evidence", 0.8),)
+
+    registry = DepartmentRegistry()
+    register_model_departments(registry, FakeGateway(), research_search_provider=FakeSearch())
+    assert isinstance(registry.get("research"), ResearchDepartmentHandler)
+    assert registry.get("research").execute("Research topic", ("Summarize",)).endswith(
+        "https://example.org/source"
+    )

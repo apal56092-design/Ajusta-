@@ -1,4 +1,5 @@
-"""AJUSTA core: planning, contracts, policy and governed skill metadata."""
+"""AJUSTA core: planning, brain dispatch, contracts, policy and skills."""
+from .brain import BrainExecutionReport, DepartmentHandler, DepartmentRegistry, execute_plan
 from .contracts import (
     ContractValidationError,
     TaskRequest,
@@ -18,6 +19,10 @@ from .skills import (
 )
 
 __all__ = [
+    "BrainExecutionReport",
+    "DepartmentHandler",
+    "DepartmentRegistry",
+    "execute_plan",
     "ContractValidationError",
     "TaskRequest",
     "TaskResult",

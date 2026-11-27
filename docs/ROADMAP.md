@@ -6,7 +6,8 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [x] Typed task request/result contracts and lifecycle statuses
 - [x] Initial department routing and central orchestration boundary
 - [x] Declarative skill manifest and in-memory registry lifecycle (draft/review/activate/disable)
-- [ ] Department execution interface and persistent skill catalog
+- [x] Explicit department-handler interface, allow-listed registry and central plan dispatcher (in-memory; no real specialist integrations yet)
+- [ ] Persistent skill catalog
 - [ ] Dependency-aware planner, bounded concurrency and cancellation
 - [ ] Structured task state, partial failures and idempotency
 - [ ] API versioning and generated API documentation
@@ -77,8 +78,7 @@ This roadmap combines the capability vision with product, security, infrastructu
 - [ ] Gradual release, monitoring, rollback and support process
 
 ## Current implementation status
-The repository contains a deterministic Python planner/orchestrator, approval-policy foundation, typed task contracts, a declarative in-memory skill registry and a CI workflow definition. The registry does not execute code and is not a sandbox. Other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.
-
+The repository contains a deterministic Python planner/orchestrator, approval-policy foundation, typed task contracts, a declarative in-memory skill registry, an explicit in-memory department-handler registry/dispatcher and a CI workflow definition. Department dispatch has no real specialist integrations yet. The registry does not execute code and is not a sandbox. Other unchecked items remain planned unless implementation and test evidence are recorded. Check actual CI results before marking tests successful.
 
 ## J. Explicit end-to-end capability delivery
 These requirements expand the existing workstreams; they remain planned until implemented and verified.

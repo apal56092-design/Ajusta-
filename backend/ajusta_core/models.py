@@ -238,7 +238,7 @@ class _ResponsesCompatibleProvider:
                             and isinstance(part.get("text"), str)
                         ):
                             parts.append(part["text"])
-        answer = "\\n".join(part for part in parts if part.strip()).strip()
+        answer = "\n".join(part for part in parts if part.strip()).strip()
         if not answer:
             raise ValueError(f"{self.name} response contains no output text")
         return ModelResponse(provider=self.name, model=self.model, text=answer)
@@ -362,7 +362,7 @@ class AnthropicMessagesProvider:
             and item.get("type") == "text"
             and isinstance(item.get("text"), str)
         ] if isinstance(content, list) else []
-        answer = "\\n".join(part for part in parts if part.strip()).strip()
+        answer = "\n".join(part for part in parts if part.strip()).strip()
         if not answer:
             raise ValueError("Anthropic response contains no output text")
         return ModelResponse(provider=self.name, model=self.model, text=answer)

@@ -17,6 +17,9 @@ class ExecutionPlan:
     disabled_departments: tuple[str, ...]
     steps: tuple[str, ...]
     status: str = "planned"
+    routing_reasons: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    confidence: float = 0.1
+    used_fallback: bool = False
 
 
 def build_execution_plan(
@@ -50,4 +53,7 @@ def build_execution_plan(
         departments=active,
         disabled_departments=unavailable,
         steps=draft.steps,
+        routing_reasons=tuple((name, words) for name, words in draft.routing_reasons if name in active),
+        confidence=draft.confidence,
+        used_fallback=draft.used_fallback,
     )

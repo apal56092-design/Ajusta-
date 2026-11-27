@@ -386,7 +386,7 @@ def test_configured_gateway_requires_at_least_one_provider(monkeypatch):
     for key in (
         "OPENAI_API_KEY", "OPENAI_MODEL", "ANTHROPIC_API_KEY",
         "ANTHROPIC_MODEL", "XAI_API_KEY", "XAI_MODEL",
-        "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL",
+        "DEEPSEEK_API_KEY", "DEEPSEEK_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL",
     ):
         monkeypatch.delenv(key, raising=False)
 

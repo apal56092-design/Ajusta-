@@ -69,6 +69,10 @@ class TaskExecutionService:
         self._store.save_result(result)
         return result
 
+    def list_tasks(self, *, user_id: str | None = None, limit: int = 20):
+        """List recent persisted tasks for one authenticated owner."""
+        return self._store.list_tasks(user_id=user_id, limit=limit)
+
     def get_task(self, task_id: str, *, user_id: str | None = None):
         if not isinstance(task_id, str) or not task_id.strip():
             raise ValueError("task_id must be a non-empty string")

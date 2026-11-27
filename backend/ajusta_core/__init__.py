@@ -15,6 +15,7 @@ from .skills import (
 )
 from .storage import SQLiteTaskStore, StoredTask
 from .service import TaskExecutionService
+from .api import create_app
 
 __all__ = [
     "BrainExecutionReport", "DepartmentHandler", "DepartmentRegistry", "ModelDepartmentHandler", "execute_plan", "register_model_departments",
@@ -24,5 +25,5 @@ __all__ = [
     "ModelAuthenticationError", "ModelRequestError", "OpenAIResponsesProvider", "AnthropicMessagesProvider", "XAIResponsesProvider", "DeepSeekResponsesProvider", "create_default_model_gateway", "create_configured_model_gateway",
     "Action", "ApprovalRequired", "authorize_action",
     "RegisteredSkill", "SkillManifest", "SkillRegistry", "SkillStatus",
-    "SkillValidationError", "validate_manifest", "SQLiteTaskStore", "StoredTask", "TaskExecutionService",
+    "SkillValidationError", "validate_manifest", "SQLiteTaskStore", "StoredTask", "TaskExecutionService", "create_app",
 ]

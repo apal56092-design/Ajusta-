@@ -1,6 +1,6 @@
 """AJUSTA HTTP API: user sessions for mobile clients plus legacy private token mode."""
 import secrets
-from fastapi import Depends, FastAPI, HTTPException, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Response, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -151,6 +151,25 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return {"id": item.id, "title": item.title, "content": item.content,
                 "created_at": item.created_at}
+
+    @app.get("/v1/knowledge/search")
+    def search_knowledge(
+        q: str = Query(min_length=1, max_length=200),
+        limit: int = Query(default=20, ge=1, le=100),
+        user=Depends(identity),
+    ):
+        require_user_session(user)
+        if knowledge_store is None:
+            raise HTTPException(status_code=503, detail="Knowledge storage is not configured.")
+        try:
+            matches = knowledge_store.search_for_user(user.user_id, q, limit=limit)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return {"items": [
+            {"id": item.id, "title": item.title, "content": item.content,
+             "created_at": item.created_at}
+            for item in matches
+        ]}
 
     @app.get("/v1/knowledge")
     def list_knowledge(user=Depends(identity)):

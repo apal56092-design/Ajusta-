@@ -49,7 +49,7 @@ class TaskExecutionService:
                     error_code="DEPARTMENTS_UNAVAILABLE", error_message=message,
                     evidence=tuple(f"unavailable:{name}" for name in unavailable))
             else:
-                sections = [f"[{name}]\n{output}" for name, output in report.department_results]
+                sections = [f"[{name}]\n{output}" for name, output in department_results]
                 if unavailable:
                     sections.append("[Unavailable departments]\n" + ", ".join(unavailable))
                 evidence = tuple([f"department:{name}" for name, _ in department_results]

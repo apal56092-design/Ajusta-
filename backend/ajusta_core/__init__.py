@@ -20,9 +20,11 @@ from .service import TaskExecutionService
 from .api import create_app
 from .research import ResearchDepartmentHandler, ResearchSource, TavilySearchProvider
 from .runtime import create_runtime_app
+from .training import (SQLiteTrainingStore, TrainingDataset, TrainingEngine, TrainingExample, TrainingRun, TrainingRunStatus)
 
 __all__ = [
     "AuthenticationError", "AuthenticatedUser", "SQLiteAuthStore",
+    "SQLiteTrainingStore", "TrainingDataset", "TrainingEngine", "TrainingExample", "TrainingRun", "TrainingRunStatus",
     "ResearchDepartmentHandler", "ResearchSource", "TavilySearchProvider", "create_runtime_app",
     "BrainExecutionReport", "DepartmentHandler", "DepartmentRegistry", "ModelDepartmentHandler", "execute_plan", "register_model_departments",
     "ContractValidationError", "TaskRequest", "TaskResult", "TaskStatus",

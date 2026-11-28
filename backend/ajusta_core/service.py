@@ -43,6 +43,19 @@ class TaskExecutionService:
             unavailable = tuple(dict.fromkeys(report.unavailable_departments + plan.disabled_departments + tuple(item.department for item in report.outcomes if item.status != "succeeded")))
             department_results = report.successful_results
             if not department_results:
+                failure_codes = {item.error_code for item in report.outcomes}
+                if "MODEL_AUTHENTICATION_FAILED" in failure_codes:
+                    result = TaskResult(task_id=task_id, status=TaskStatus.FAILED,
+                        error_code="MODEL_AUTHENTICATION_FAILED",
+                        error_message="The configured AI provider could not authenticate.")
+                    self._store.save_result(result)
+                    return result
+                if "MODEL_UNAVAILABLE" in failure_codes:
+                    result = TaskResult(task_id=task_id, status=TaskStatus.FAILED,
+                        error_code="MODEL_UNAVAILABLE",
+                        error_message="No configured AI provider is currently available.")
+                    self._store.save_result(result)
+                    return result
                 message = ("No requested department was available: " + ", ".join(unavailable)
                            if unavailable else "No department returned a result.")
                 result = TaskResult(task_id=task_id, status=TaskStatus.FAILED,

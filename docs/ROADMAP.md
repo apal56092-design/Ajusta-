@@ -15,7 +15,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Versioned schema migrations and dependency-aware planner
 - [x] Single-worker lifecycle, authenticated async submission/status API, durable queue-to-result synchronization and queued-task cancellation
 - [x] Owner-scoped durable task progress events, lease-bound monotonic progress updates and async status exposure
-- [ ] Bounded multi-worker concurrency, running-task cooperative cancellation and lease renewal
+- [ ] Bounded multi-worker queue concurrency\n- [x] Running-task cooperative cancellation and lease renewal
 - [x] Durable SQLite queue primitives: atomic claims, expiring leases, bounded retries and owner-checked queued cancellation
 - [x] FastAPI task API with both private service-token mode and user-session mode
 - [x] Bounded, authenticated, per-user task history endpoint with owner isolation
@@ -38,7 +38,7 @@ A checkbox is complete only when implementation and verification evidence exist.
 - [ ] Emergency provider disable and user consent for external processing
 
 ## D. Skills and departments
-- [x] Six model-backed departments registered in the Brain
+- [x] Six model-backed departments registered in the Brain\n- [x] Bounded parallel coordination across registered departments with deterministic result ordering, deadline and per-agent failure reporting
 - [x] Optional Tavily search adapter for Research, with bounded results, HTTPS source validation, untrusted-excerpt handling and source list
 - [x] Runtime factory enables Tavily Research when TAVILY_API_KEY is configured server-side
 - [ ] Coding department with isolated sandbox and test execution

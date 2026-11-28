@@ -2,6 +2,7 @@
 from dataclasses import dataclass
 import json
 import os
+import time
 from typing import Callable, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -483,6 +484,12 @@ class ModelGateway:
     def generate(
         self, request: ModelRequest, preferred_provider: str | None = None
     ) -> ModelResponse:
+        return self.generate_with_trace(request, preferred_provider).response
+
+    def generate_with_trace(
+        self, request: ModelRequest, preferred_provider: str | None = None
+    ) -> "ModelGeneration":
+        """Generate a response and return privacy-safe per-provider routing telemetry."""
         if not isinstance(request, ModelRequest):
             raise TypeError("request must be a ModelRequest")
         providers = self._providers
@@ -499,10 +506,18 @@ class ModelGateway:
             raise ModelUnavailableError("no model providers are registered")
 
         failures: list[str] = []
+        attempts: list[ModelAttempt] = []
         for provider in providers:
+            started = time.monotonic()
             try:
                 response = provider.generate(request)
             except ModelUnavailableError as exc:
+                attempts.append(ModelAttempt(
+                    provider=provider.name,
+                    outcome="unavailable",
+                    duration_ms=max(0, round((time.monotonic() - started) * 1000)),
+                    error_type=type(exc).__name__,
+                ))
                 failures.append(f"{provider.name}: {exc}")
                 continue
             if not isinstance(response, ModelResponse):
@@ -513,7 +528,12 @@ class ModelGateway:
                 raise ValueError("model name must be a non-empty string")
             if not isinstance(response.text, str) or not response.text.strip():
                 raise ValueError("model response text must be a non-empty string")
-            return response
+            attempts.append(ModelAttempt(
+                provider=provider.name,
+                outcome="success",
+                duration_ms=max(0, round((time.monotonic() - started) * 1000)),
+            ))
+            return ModelGeneration(response=response, attempts=tuple(attempts))
 
         raise ModelUnavailableError("all model providers are unavailable: " + "; ".join(failures))
 

@@ -452,3 +452,26 @@ def test_configured_gateway_registers_gemini_when_server_credentials_exist(monke
 
     gateway = create_configured_model_gateway()
     assert [provider.name for provider in gateway._providers] == ["gemini", "openai"]
+
+
+def test_gateway_exposes_provider_attempt_trace_without_prompt_or_secret_data():
+    from ajusta_core.models import ModelGateway, ModelRequest, ModelResponse, ModelUnavailableError
+
+    class Offline:
+        name = "offline"
+        def generate(self, request):
+            raise ModelUnavailableError("temporary outage")
+
+    class Healthy:
+        name = "healthy"
+        def generate(self, request):
+            return ModelResponse(provider="healthy", model="test", text="answer")
+
+    gateway = ModelGateway((Offline(), Healthy()))
+    result = gateway.generate_with_trace(ModelRequest(prompt="private prompt"))
+
+    assert result.response.text == "answer"
+    assert [attempt.provider for attempt in result.attempts] == ["offline", "healthy"]
+    assert [attempt.outcome for attempt in result.attempts] == ["unavailable", "success"]
+    assert all(attempt.duration_ms >= 0 for attempt in result.attempts)
+    assert "private prompt" not in repr(result.attempts)

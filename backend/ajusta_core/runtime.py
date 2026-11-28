@@ -21,6 +21,7 @@ from .knowledge_store import SQLiteKnowledgeStore
 from .storage import SQLiteTaskStore
 from .durable_queue import SQLiteTaskQueue
 from .worker import DurableTaskWorker
+from .training import SQLiteTrainingStore, TrainingEngine
 
 
 def create_runtime_app(
@@ -56,6 +57,8 @@ def create_runtime_app(
     task_queue = SQLiteTaskQueue(database_path)
     skill_store = SQLiteSkillStore(database_path)
     knowledge_store = SQLiteKnowledgeStore(database_path)
+    training_store = SQLiteTrainingStore(database_path)
+    training_engine = TrainingEngine(training_store)
     audit_store = SQLiteSkillAuditStore(database_path)
     skill_engine = SkillExecutionEngine(skill_store=skill_store, audit_store=audit_store)
 
@@ -183,6 +186,7 @@ def create_runtime_app(
         knowledge_store=knowledge_store, skill_engine=skill_engine,
         skill_permission_resolver=resolve_skill_permissions,
         task_queue=task_queue, task_worker=task_worker,
+        training_store=training_store, training_engine=training_engine,
     )
     app.state.task_service = service
     app.state.task_queue = task_queue
@@ -192,6 +196,8 @@ def create_runtime_app(
     app.state.skill_store = skill_store
     app.state.skill_engine = skill_engine
     app.state.knowledge_store = knowledge_store
+    app.state.training_store = training_store
+    app.state.training_engine = training_engine
     app.state.skill_audit_store = audit_store
     app.state.research_search_provider = selected_search
     return app

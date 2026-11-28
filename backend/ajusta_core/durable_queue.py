@@ -23,6 +23,7 @@ class QueueItem:
     lease_until: float | None
     progress_percent: int = 0
     progress_message: str = "Queued"
+    cancel_requested: bool = False
 
 
 class SQLiteTaskQueue:
@@ -42,13 +43,16 @@ class SQLiteTaskQueue:
                 status TEXT NOT NULL CHECK(status IN ('queued','running','succeeded','failed','cancelled')),
                 attempts INTEGER NOT NULL DEFAULT 0, lease_token TEXT, lease_until REAL,
                 created_at REAL NOT NULL, updated_at REAL NOT NULL, error TEXT,
-                progress_percent INTEGER NOT NULL DEFAULT 0, progress_message TEXT NOT NULL DEFAULT 'Queued'
+                progress_percent INTEGER NOT NULL DEFAULT 0, progress_message TEXT NOT NULL DEFAULT 'Queued',
+                cancel_requested_at REAL
             )""")
             columns = {row["name"] for row in db.execute("PRAGMA table_info(task_queue)")}
             if "progress_percent" not in columns:
                 db.execute("ALTER TABLE task_queue ADD COLUMN progress_percent INTEGER NOT NULL DEFAULT 0")
             if "progress_message" not in columns:
                 db.execute("ALTER TABLE task_queue ADD COLUMN progress_message TEXT NOT NULL DEFAULT 'Queued'")
+            if "cancel_requested_at" not in columns:
+                db.execute("ALTER TABLE task_queue ADD COLUMN cancel_requested_at REAL")
             db.execute("CREATE INDEX IF NOT EXISTS task_queue_claim_idx ON task_queue(status, created_at)")
             db.execute("""CREATE TABLE IF NOT EXISTS task_progress_events (
                 event_id INTEGER PRIMARY KEY AUTOINCREMENT, task_id TEXT NOT NULL,
@@ -69,7 +73,8 @@ class SQLiteTaskQueue:
             raise ValueError("queued payload must be an object")
         return QueueItem(row["task_id"], row["owner_id"], payload, row["status"],
                          row["attempts"], row["lease_token"], row["lease_until"],
-                         row["progress_percent"], row["progress_message"])
+                         row["progress_percent"], row["progress_message"],
+                         row["cancel_requested_at"] is not None)
 
     @staticmethod
     def _event(db, task_id, owner_id, status, percent, message, now):
@@ -135,6 +140,50 @@ class SQLiteTaskQueue:
             db.commit()
         return self._item(claimed)
 
+    def renew_lease(self, task_id: str, lease_token: str, *, lease_seconds: int = 300) -> bool:
+        if not isinstance(lease_seconds, int) or isinstance(lease_seconds, bool) or not 5 <= lease_seconds <= 3600:
+            raise ValueError("lease_seconds must be between 5 and 3600")
+        now = time.time()
+        with self._connect() as db:
+            cursor = db.execute("""UPDATE task_queue SET lease_until=?, updated_at=?
+                WHERE task_id=? AND status='running' AND lease_token=?""",
+                (now + lease_seconds, now, task_id, lease_token))
+            return cursor.rowcount == 1
+
+    def request_cancel(self, task_id: str, owner_id: str) -> str:
+        now = time.time()
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("""SELECT status,progress_percent,cancel_requested_at FROM task_queue
+                WHERE task_id=? AND owner_id=?""", (task_id, owner_id)).fetchone()
+            if row is None:
+                db.commit()
+                return "not_found"
+            if row["status"] == "queued":
+                db.execute("""UPDATE task_queue SET status='cancelled',updated_at=?,
+                    progress_message='Cancelled before execution' WHERE task_id=? AND owner_id=? AND status='queued'""",
+                    (now, task_id, owner_id))
+                self._event(db, task_id, owner_id, "cancelled", row["progress_percent"], "Cancelled before execution", now)
+                db.commit()
+                return "cancelled"
+            if row["status"] == "running":
+                if row["cancel_requested_at"] is None:
+                    db.execute("""UPDATE task_queue SET cancel_requested_at=?,updated_at=?,
+                        progress_message='Cancellation requested' WHERE task_id=? AND owner_id=? AND status='running'""",
+                        (now, now, task_id, owner_id))
+                    self._event(db, task_id, owner_id, "running", row["progress_percent"], "Cancellation requested", now)
+                db.commit()
+                return "requested"
+            db.commit()
+            return "terminal"
+
+    def is_cancel_requested(self, task_id: str, lease_token: str) -> bool:
+        with self._connect() as db:
+            row = db.execute("""SELECT cancel_requested_at FROM task_queue
+                WHERE task_id=? AND status='running' AND lease_token=?""",
+                (task_id, lease_token)).fetchone()
+        return row is not None and row["cancel_requested_at"] is not None
+
     def report_progress(self, task_id: str, lease_token: str, progress_percent: int, message: str) -> bool:
         if not isinstance(progress_percent, int) or isinstance(progress_percent, bool) or not 0 <= progress_percent <= 99:
             raise ValueError("progress_percent must be between 0 and 99")
@@ -142,7 +191,7 @@ class SQLiteTaskQueue:
             raise ValueError("progress message must contain 1 to 300 characters")
         now = time.time()
         with self._connect() as db:
-            row = db.execute("""SELECT owner_id,progress_percent FROM task_queue
+            row = db.execute("""SELECT owner_id,progress_percent,cancel_requested_at FROM task_queue
                 WHERE task_id=? AND status='running' AND lease_token=?""", (task_id, lease_token)).fetchone()
             if row is None or progress_percent < row["progress_percent"]:
                 return False
@@ -152,21 +201,27 @@ class SQLiteTaskQueue:
             self._event(db, task_id, row["owner_id"], "running", progress_percent, message, now)
             return True
 
-    def complete(self, task_id: str, lease_token: str, *, succeeded: bool, error: str | None = None) -> bool:
+    def complete(self, task_id: str, lease_token: str, *, succeeded: bool, error: str | None = None, cancelled: bool = False) -> bool:
         if not isinstance(succeeded, bool):
             raise TypeError("succeeded must be a boolean")
-        status = "succeeded" if succeeded else "failed"
+        if not isinstance(cancelled, bool):
+            raise TypeError("cancelled must be a boolean")
+        status = "cancelled" if cancelled else ("succeeded" if succeeded else "failed")
         safe_error = error[:500] if isinstance(error, str) else None
         now = time.time()
-        message = "Task completed" if succeeded else "Task failed"
+        message = "Task cancelled cooperatively" if cancelled else ("Task completed" if succeeded else "Task failed")
         with self._connect() as db:
-            row = db.execute("""SELECT owner_id,progress_percent FROM task_queue
+            row = db.execute("""SELECT owner_id,progress_percent,cancel_requested_at FROM task_queue
                 WHERE task_id=? AND status='running' AND lease_token=?""", (task_id, lease_token)).fetchone()
             if row is None:
                 return False
-            percent = 100 if succeeded else row["progress_percent"]
+            if row["cancel_requested_at"] is not None:
+                cancelled = True
+                status = "cancelled"
+                message = "Task cancelled cooperatively"
+            percent = 100 if succeeded and not cancelled else row["progress_percent"]
             cursor = db.execute("""UPDATE task_queue SET status=?, error=?, lease_token=NULL,
-                lease_until=NULL, updated_at=?, progress_percent=?, progress_message=?
+                lease_until=NULL, updated_at=?, progress_percent=?, progress_message=?, cancel_requested_at=NULL
                 WHERE task_id=? AND status='running' AND lease_token=?""",
                 (status, safe_error, now, percent, message, task_id, lease_token))
             if cursor.rowcount == 1:
@@ -175,19 +230,8 @@ class SQLiteTaskQueue:
             return False
 
     def cancel(self, task_id: str, owner_id: str) -> bool:
-        now = time.time()
-        with self._connect() as db:
-            row = db.execute("""SELECT progress_percent FROM task_queue
-                WHERE task_id=? AND owner_id=? AND status='queued'""", (task_id, owner_id)).fetchone()
-            if row is None:
-                return False
-            cursor = db.execute("""UPDATE task_queue SET status='cancelled', updated_at=?,
-                progress_message='Cancelled before execution'
-                WHERE task_id=? AND owner_id=? AND status='queued'""", (now, task_id, owner_id))
-            if cursor.rowcount == 1:
-                self._event(db, task_id, owner_id, "cancelled", row["progress_percent"], "Cancelled before execution", now)
-                return True
-            return False
+        """Backward-compatible queued-only cancellation helper."""
+        return self.request_cancel(task_id, owner_id) == "cancelled"
 
     def get(self, task_id: str, owner_id: str) -> QueueItem | None:
         with self._connect() as db:

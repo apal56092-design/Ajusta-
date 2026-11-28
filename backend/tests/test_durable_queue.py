@@ -81,3 +81,25 @@ def test_successful_completion_records_one_hundred_percent(tmp_path):
     assert item.status == "succeeded"
     assert item.progress_percent == 100
     assert queue.list_events("done-1", "owner-a")[-1]["message"] == "Task completed"
+
+
+def test_running_task_cancellation_is_a_request_and_owner_scoped(tmp_path):
+    queue = SQLiteTaskQueue(tmp_path / "running-cancel.sqlite3")
+    queue.enqueue("running-1", "owner-a", {"instruction": "Work"})
+    claimed = queue.claim_next("worker", lease_seconds=30)
+
+    assert queue.request_cancel("running-1", "owner-b") == "not_found"
+    assert queue.request_cancel("running-1", "owner-a") == "requested"
+    assert queue.is_cancel_requested("running-1", claimed.lease_token) is True
+    assert queue.get("running-1", "owner-a").status == "running"
+
+
+def test_lease_can_be_renewed_only_by_current_worker_token(tmp_path):
+    queue = SQLiteTaskQueue(tmp_path / "renew.sqlite3")
+    queue.enqueue("renew-1", "owner-a", {"instruction": "Work"})
+    claimed = queue.claim_next("worker", lease_seconds=5)
+
+    assert queue.renew_lease("renew-1", "wrong-token", lease_seconds=30) is False
+    assert queue.renew_lease("renew-1", claimed.lease_token, lease_seconds=30) is True
+    renewed = queue.get("renew-1", "owner-a")
+    assert renewed.lease_until > claimed.lease_until

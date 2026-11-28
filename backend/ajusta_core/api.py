@@ -365,6 +365,7 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         progress = {
             "progress_percent": item.progress_percent,
             "progress_message": item.progress_message,
+            "cancel_requested": item.cancel_requested,
             "progress_events": events,
         }
         stored = service.get_task(task_id, user_id=user.user_id)
@@ -378,11 +379,13 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         require_user_session(user)
         if task_queue is None:
             raise HTTPException(status_code=503, detail="Background task execution is not configured.")
-        if not task_queue.cancel(task_id, user.user_id):
-            item = task_queue.get(task_id, user.user_id)
-            if item is None:
-                raise HTTPException(status_code=404, detail="Task not found.")
-            raise HTTPException(status_code=409, detail="Only queued tasks can be cancelled.")
+        outcome = task_queue.request_cancel(task_id, user.user_id)
+        if outcome == "not_found":
+            raise HTTPException(status_code=404, detail="Task not found.")
+        if outcome == "terminal":
+            raise HTTPException(status_code=409, detail="Task is already complete.")
+        if outcome == "requested":
+            return {"task_id": task_id, "status": "cancellation_requested"}
         return {"task_id": task_id, "status": "cancelled"}
 
     @app.get("/v1/tasks/{task_id}", response_model=TaskResponse)

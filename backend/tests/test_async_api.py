@@ -89,3 +89,23 @@ def test_async_cancel_only_cancels_queued_tasks(tmp_path):
     assert cancelled.status_code == 200
     assert cancelled.json()["status"] == "cancelled"
     assert client.delete("/v1/tasks/async/cancel-1", headers=headers).status_code == 409
+
+
+def test_running_async_cancel_returns_request_and_status_is_visible(tmp_path):
+    client, worker, token, owner_id = setup(tmp_path)
+    headers = {"Authorization": f"Bearer {token}"}
+    body = {"task_id": "running-cancel", "instruction": "Research solar power"}
+    assert client.post("/v1/tasks/async", headers=headers, json=body).status_code == 202
+    queue = worker._queue
+    claimed = queue.claim_next("manual-worker", lease_seconds=30)
+
+    response = client.delete("/v1/tasks/async/running-cancel", headers=headers)
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancellation_requested"
+    status = client.get("/v1/tasks/async/running-cancel", headers=headers).json()
+    assert status["status"] == "running"
+    assert status["cancel_requested"] is True
+
+    assert queue.complete(claimed.task_id, claimed.lease_token, succeeded=True) is True
+    final = client.get("/v1/tasks/async/running-cancel", headers=headers).json()
+    assert final["status"] == "cancelled"

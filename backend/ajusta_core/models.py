@@ -458,6 +458,22 @@ class GeminiGenerateContentProvider:
         return ModelResponse(provider=self.name, model=self.model, text=answer)
 
 
+@dataclass(frozen=True)
+class ModelAttempt:
+    """Privacy-safe telemetry for one provider routing attempt."""
+    provider: str
+    outcome: str
+    duration_ms: int
+    error_type: str | None = None
+
+
+@dataclass(frozen=True)
+class ModelGeneration:
+    """A response plus ordered provider attempts; contains no prompt or credentials."""
+    response: ModelResponse
+    attempts: tuple[ModelAttempt, ...]
+
+
 class ModelGateway:
     """Routes requests across explicitly registered providers.
 

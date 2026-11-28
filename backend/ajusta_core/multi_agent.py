@@ -12,6 +12,7 @@ from typing import Callable
 
 from .brain import DepartmentRegistry
 from .orchestrator import ExecutionPlan
+from .models import ModelAuthenticationError, ModelUnavailableError
 
 
 @dataclass(frozen=True)
@@ -94,6 +95,10 @@ def coordinate_agents(
                     outcomes[name] = AgentOutcome(name, "failed", error_code="EMPTY_OUTPUT")
                 else:
                     outcomes[name] = AgentOutcome(name, "succeeded", output=output.strip())
+            except ModelAuthenticationError:
+                outcomes[name] = AgentOutcome(name, "failed", error_code="MODEL_AUTHENTICATION_FAILED")
+            except ModelUnavailableError:
+                outcomes[name] = AgentOutcome(name, "failed", error_code="MODEL_UNAVAILABLE")
             except Exception:
                 outcomes[name] = AgentOutcome(name, "failed", error_code="DEPARTMENT_ERROR")
     except TimeoutError:

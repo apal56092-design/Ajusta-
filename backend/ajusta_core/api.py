@@ -15,6 +15,7 @@ from .orchestrator import build_execution_plan
 from .skill_execution import SkillExecutionEngine
 from .durable_queue import SQLiteTaskQueue
 from .worker import DurableTaskWorker
+from .training import SQLiteTrainingStore, TrainingEngine
 
 
 class TaskSubmission(BaseModel):
@@ -38,6 +39,27 @@ class KnowledgeSubmission(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
+class TrainingDatasetSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=1000)
+
+
+class TrainingExampleSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    input: str = Field(min_length=1, max_length=8000)
+    target: str = Field(min_length=1, max_length=8000)
+    source: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class TrainingRunSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    dataset_id: str = Field(min_length=1, max_length=100)
+    trainer_name: str = Field(min_length=1, max_length=80)
+    config: dict = Field(default_factory=dict)
+    approved_by_user: bool = False
+
+
 class Credentials(BaseModel):
     model_config = ConfigDict(extra="forbid")
     email: str = Field(min_length=3, max_length=254)
@@ -59,6 +81,15 @@ class TaskResponse(BaseModel):
     error_message: str | None = None
 
 
+def _training_run_payload(run):
+    return {
+        "id": run.id, "dataset_id": run.dataset_id, "trainer_name": run.trainer_name,
+        "status": run.status.value, "config": dict(run.config), "metrics": dict(run.metrics),
+        "error_code": run.error_code, "created_at": run.created_at,
+        "completed_at": run.completed_at,
+    }
+
+
 def _result_payload(result):
     return {"task_id": result.task_id, "status": result.status.value, "result": result.result,
             "evidence": list(result.evidence), "error_code": result.error_code,
@@ -72,7 +103,9 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
                skill_engine: SkillExecutionEngine | None = None,
                skill_permission_resolver: Callable[[str, tuple[str, ...]], set[str] | frozenset[str]] | None = None,
                task_queue: SQLiteTaskQueue | None = None,
-               task_worker: DurableTaskWorker | None = None) -> FastAPI:
+               task_worker: DurableTaskWorker | None = None,
+               training_store: SQLiteTrainingStore | None = None,
+               training_engine: TrainingEngine | None = None) -> FastAPI:
     """Create app in user-session mode or restricted legacy service-token mode."""
     if not isinstance(service, TaskExecutionService):
         raise TypeError("service must be a TaskExecutionService")
@@ -92,6 +125,12 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         raise TypeError("task_queue must be an SQLiteTaskQueue")
     if task_worker is not None and not isinstance(task_worker, DurableTaskWorker):
         raise TypeError("task_worker must be a DurableTaskWorker")
+    if training_store is not None and not isinstance(training_store, SQLiteTrainingStore):
+        raise TypeError("training_store must be a SQLiteTrainingStore")
+    if training_engine is not None and not isinstance(training_engine, TrainingEngine):
+        raise TypeError("training_engine must be a TrainingEngine")
+    if (training_store is None) != (training_engine is None):
+        raise ValueError("training_store and training_engine must be configured together")
     if (task_queue is None) != (task_worker is None):
         raise ValueError("task_queue and task_worker must be configured together")
 
@@ -272,6 +311,92 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         if not knowledge_store.delete(user.user_id, record_id):
             raise HTTPException(status_code=404, detail="Knowledge record not found.")
         return Response(status_code=204)
+
+    def require_training(user):
+        require_user_session(user)
+        if training_store is None or training_engine is None:
+            raise HTTPException(status_code=503, detail="Governed model training is not configured.")
+
+    @app.post("/v1/training/datasets", status_code=201)
+    def create_training_dataset(body: TrainingDatasetSubmission, user=Depends(identity)):
+        require_training(user)
+        try:
+            dataset = training_store.create_dataset(user.user_id, body.name, body.description)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return {"id": dataset.id, "name": dataset.name, "description": dataset.description,
+                "created_at": dataset.created_at}
+
+    @app.get("/v1/training/datasets")
+    def list_training_datasets(user=Depends(identity)):
+        require_training(user)
+        return {"items": [
+            {"id": item.id, "name": item.name, "description": item.description,
+             "created_at": item.created_at}
+            for item in training_store.list_datasets(user.user_id)
+        ]}
+
+    @app.post("/v1/training/datasets/{dataset_id}/examples", status_code=201)
+    def add_training_example(dataset_id: str, body: TrainingExampleSubmission,
+                             user=Depends(identity)):
+        require_training(user)
+        try:
+            item = training_store.add_example(
+                user.user_id, dataset_id, body.input, body.target, source=body.source
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Training dataset not found.") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return {"id": item.id, "dataset_id": item.dataset_id, "input": item.input_text,
+                "target": item.target_text, "source": item.source, "created_at": item.created_at}
+
+    @app.get("/v1/training/datasets/{dataset_id}/examples")
+    def list_training_examples(dataset_id: str, user=Depends(identity)):
+        require_training(user)
+        if not any(item.id == dataset_id for item in training_store.list_datasets(user.user_id)):
+            raise HTTPException(status_code=404, detail="Training dataset not found.")
+        return {"items": [
+            {"id": item.id, "input": item.input_text, "target": item.target_text,
+             "source": item.source, "created_at": item.created_at}
+            for item in training_store.list_examples(user.user_id, dataset_id)
+        ]}
+
+    @app.post("/v1/training/runs", status_code=201)
+    def start_training_run(body: TrainingRunSubmission, user=Depends(identity)):
+        require_training(user)
+        if body.approved_by_user is not True:
+            raise HTTPException(status_code=403, detail="Explicit user approval is required.")
+        try:
+            run = training_engine.run(
+                user.user_id, body.dataset_id, trainer_name=body.trainer_name,
+                config=body.config, approved=True,
+            )
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Dataset or registered trainer not found.") from None
+        except PermissionError:
+            raise HTTPException(status_code=403, detail="Training approval is required.") from None
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return _training_run_payload(run)
+
+    @app.get("/v1/training/runs")
+    def list_training_runs(limit: int = Query(default=20, ge=1, le=100),
+                           user=Depends(identity)):
+        require_training(user)
+        return {"items": [
+            _training_run_payload(item)
+            for item in training_store.list_runs(user.user_id, limit=limit)
+        ]}
+
+    @app.get("/v1/training/runs/{run_id}")
+    def get_training_run(run_id: str, user=Depends(identity)):
+        require_training(user)
+        try:
+            run = training_store.get_run(user.user_id, run_id)
+        except KeyError:
+            raise HTTPException(status_code=404, detail="Training run not found.") from None
+        return _training_run_payload(run)
 
     @app.get("/v1/health")
     def health(user=Depends(identity)):

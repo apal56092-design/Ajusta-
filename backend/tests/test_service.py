@@ -152,3 +152,35 @@ def test_service_uses_multi_agent_results_and_records_partial_failures(tmp_path)
     assert "research analysis" in result.result
     assert "data" in result.result
     assert "unavailable:data" in result.evidence
+
+
+def test_service_surfaces_structured_evidence_verification(tmp_path):
+    from ajusta_core.verification import (
+        DepartmentEvidenceResponse, EvidenceRecord, VerificationClaim,
+    )
+
+    class EvidenceAgent:
+        name = "research"
+
+        def execute(self, objective, steps):
+            return DepartmentEvidenceResponse(
+                text="The report states that costs fell.",
+                claims=(VerificationClaim("cost-claim", "Costs fell.", ("report-1",)),),
+                evidence=(EvidenceRecord(
+                    "report-1", "https://example.org/report", "Annual report",
+                    "Costs fell during the period.", "supports",
+                ),),
+            )
+
+    registry = DepartmentRegistry()
+    registry.register(EvidenceAgent())
+    service = TaskExecutionService(
+        store=SQLiteTaskStore(tmp_path / "evidence-service.sqlite3"),
+        registry=registry,
+        enabled_departments={"research"},
+    )
+    result = service.submit("evidence-task", TaskRequest("Research the report"))
+    assert result.status is TaskStatus.SUCCEEDED
+    assert "[research verification]" in result.result
+    assert "cost-claim: supported" in result.result
+    assert "not a truth guarantee" in result.result

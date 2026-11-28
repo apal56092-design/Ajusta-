@@ -132,3 +132,27 @@ def verify_claims(
         ))
 
     return VerificationReport(tuple(verified), len(source_map), len(verified))
+
+
+@dataclass(frozen=True)
+class DepartmentEvidenceResponse:
+    """Optional structured department result with explicit claim/source links.
+
+    Plain-string department outputs remain supported; only this explicit contract
+    is eligible for deterministic evidence verification.
+    """
+    text: str
+    claims: tuple[VerificationClaim, ...]
+    evidence: tuple[EvidenceRecord, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.text, str) or not self.text.strip() or len(self.text) > 20000:
+            raise ValueError("text must contain 1 to 20000 characters")
+        if not isinstance(self.claims, tuple) or len(self.claims) > 100:
+            raise ValueError("claims must be a tuple containing at most 100 records")
+        if not isinstance(self.evidence, tuple) or len(self.evidence) > 100:
+            raise ValueError("evidence must be a tuple containing at most 100 records")
+        if any(not isinstance(item, VerificationClaim) for item in self.claims):
+            raise TypeError("claims must contain VerificationClaim records")
+        if any(not isinstance(item, EvidenceRecord) for item in self.evidence):
+            raise TypeError("evidence must contain EvidenceRecord records")

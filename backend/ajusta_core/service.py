@@ -63,6 +63,18 @@ class TaskExecutionService:
                     evidence=tuple(f"unavailable:{name}" for name in unavailable))
             else:
                 sections = [f"[{name}]\n{output}" for name, output in department_results]
+                for outcome in report.outcomes:
+                    verification = outcome.evidence_verification
+                    if verification is None:
+                        continue
+                    lines = ["[Evidence verification]", "This is provenance checking, not a truth guarantee."]
+                    for claim in verification.claims:
+                        lines.append(
+                            f"- {claim.claim_id}: {claim.status}; "
+                            f"supporting={','.join(claim.supporting_sources) or 'none'}; "
+                            f"contradicting={','.join(claim.contradicting_sources) or 'none'}"
+                        )
+                    sections.append(f"[{outcome.department} verification]\n" + "\n".join(lines))
                 if unavailable:
                     sections.append("[Unavailable departments]\n" + ", ".join(unavailable))
                 evidence = tuple([f"department:{name}" for name, _ in department_results]

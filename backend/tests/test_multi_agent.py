@@ -75,3 +75,28 @@ def test_parallelism_and_timeout_are_bounded():
             pass
         else:
             raise AssertionError("invalid timeout must be rejected")
+
+
+from ajusta_core.verification import EvidenceRecord, VerificationClaim, DepartmentEvidenceResponse
+
+
+def test_multi_agent_verifies_structured_department_evidence():
+    registry = DepartmentRegistry()
+    registry.register(Agent("research", output=DepartmentEvidenceResponse(
+        text="The report says costs fell.",
+        claims=(VerificationClaim("claim-1", "Costs fell.", ("source-1",)),),
+        evidence=(EvidenceRecord("source-1", "https://example.org/report", "Report", "Costs fell.", "supports"),),
+    )))
+    report = coordinate_agents(make_plan("research"), registry)
+    outcome = report.outcomes[0]
+    assert outcome.status == "succeeded"
+    assert outcome.evidence_verification is not None
+    assert outcome.evidence_verification.claims[0].status == "supported"
+
+
+def test_multi_agent_keeps_plain_text_departments_backward_compatible():
+    registry = DepartmentRegistry()
+    registry.register(Agent("research", output="Plain text answer"))
+    report = coordinate_agents(make_plan("research"), registry)
+    assert report.successful_results == (("research", "Plain text answer"),)
+    assert report.outcomes[0].evidence_verification is None

@@ -82,3 +82,12 @@ unsupported, contested and invalid references. See [Evidence Verification](../do
 
 This is provenance validation, not a truth oracle: source authenticity, excerpt
 entailment and live publisher verification remain outside this module.
+
+
+## Multi-agent evidence verification
+
+Departments can optionally return structured claims and evidence through
+`DepartmentEvidenceResponse`. AJUSTA checks explicit source links and includes
+the resulting provenance statuses in task output; plain-text department responses
+remain compatible and are not presented as verified. See
+[Multi-Agent Evidence Verification](docs/MULTI_AGENT_EVIDENCE_VERIFICATION.md).

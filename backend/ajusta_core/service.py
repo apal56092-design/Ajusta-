@@ -1,5 +1,6 @@
 """Synchronous task execution service with persisted ownership metadata."""
-from .brain import DepartmentRegistry, execute_plan
+from .brain import DepartmentRegistry
+from .multi_agent import coordinate_agents
 from .contracts import TaskRequest, TaskResult, TaskStatus
 from .models import ModelAuthenticationError, ModelUnavailableError
 from .orchestrator import build_execution_plan
@@ -38,9 +39,10 @@ class TaskExecutionService:
         self._store.save_result(TaskResult(task_id, TaskStatus.RUNNING))
         try:
             plan = build_execution_plan(request.instruction, enabled_departments=self._enabled_departments, action=action)
-            report = execute_plan(plan, self._registry)
-            unavailable = tuple(dict.fromkeys(report.unavailable_departments + plan.disabled_departments))
-            if not report.department_results:
+            report = coordinate_agents(plan, self._registry)
+            unavailable = tuple(dict.fromkeys(report.unavailable_departments + plan.disabled_departments + tuple(item.department for item in report.outcomes if item.status != "succeeded")))
+            department_results = report.successful_results
+            if not department_results:
                 message = ("No requested department was available: " + ", ".join(unavailable)
                            if unavailable else "No department returned a result.")
                 result = TaskResult(task_id=task_id, status=TaskStatus.FAILED,
@@ -50,7 +52,7 @@ class TaskExecutionService:
                 sections = [f"[{name}]\n{output}" for name, output in report.department_results]
                 if unavailable:
                     sections.append("[Unavailable departments]\n" + ", ".join(unavailable))
-                evidence = tuple([f"department:{name}" for name, _ in report.department_results]
+                evidence = tuple([f"department:{name}" for name, _ in department_results]
                                  + [f"unavailable:{name}" for name in unavailable])
                 result = TaskResult(task_id=task_id, status=TaskStatus.SUCCEEDED,
                                     result="\n\n".join(sections), evidence=evidence)

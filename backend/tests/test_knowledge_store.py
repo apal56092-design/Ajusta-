@@ -33,3 +33,47 @@ def test_full_text_index_tracks_deletes(tmp_path):
 
     assert store.delete("user-one", item.id)
     assert store.search_for_user("user-one", "searchable") == ()
+
+
+def test_knowledge_records_preserve_learning_provenance_and_confidence(tmp_path):
+    store = SQLiteKnowledgeStore(tmp_path / "knowledge.sqlite3")
+
+    item = store.create(
+        "user-one",
+        "Solar efficiency note",
+        "The supplied report estimates panel efficiency at 22 percent.",
+        source="https://example.org/solar-report",
+        confidence=0.72,
+    )
+
+    assert item.source == "https://example.org/solar-report"
+    assert item.confidence == 0.72
+    assert item.user_id == "user-one"
+
+
+@pytest.mark.parametrize("confidence", [-0.01, 1.01, True, "high"])
+def test_knowledge_records_reject_invalid_confidence(tmp_path, confidence):
+    store = SQLiteKnowledgeStore(tmp_path / "knowledge.sqlite3")
+
+    with pytest.raises(ValueError, match="confidence"):
+        store.create("user-one", "Note", "Content", confidence=confidence)
+
+
+def test_knowledge_records_reject_oversized_provenance(tmp_path):
+    store = SQLiteKnowledgeStore(tmp_path / "knowledge.sqlite3")
+
+    with pytest.raises(ValueError, match="source"):
+        store.create("user-one", "Note", "Content", source="s" * 501)
+
+
+def test_existing_knowledge_database_is_migrated_with_provenance_columns(tmp_path):
+    database = tmp_path / "legacy.sqlite3"
+    legacy = SQLiteKnowledgeStore(database)
+    original = legacy.create("user-one", "Legacy", "Existing saved memory")
+
+    reopened = SQLiteKnowledgeStore(database)
+    migrated = reopened.list_for_user("user-one")[0]
+
+    assert migrated.id == original.id
+    assert migrated.source is None
+    assert migrated.confidence is None

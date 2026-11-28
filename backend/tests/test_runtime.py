@@ -148,3 +148,19 @@ def test_runtime_exposes_research_search_only_when_provider_is_configured(tmp_pa
     assert source["title"] == "AJUSTA research source"
     assert source["url"] == "https://example.org/research"
     assert "safe AI orchestration" in source["content"]
+
+
+def test_runtime_wires_persistent_training_store_and_empty_trusted_trainer_registry(tmp_path):
+    from ajusta_core.training import SQLiteTrainingStore, TrainingEngine
+
+    app = create_runtime_app(
+        database_path=tmp_path / "tasks.sqlite3",
+        auth_database_path=tmp_path / "auth.sqlite3",
+        gateway=FakeGateway(),
+        search_provider=None,
+    )
+
+    assert isinstance(app.state.training_store, SQLiteTrainingStore)
+    assert isinstance(app.state.training_engine, TrainingEngine)
+    # Runtime does not silently invent a model trainer; deployments register a
+    # reviewed host-side adapter before exposing actual fine-tuning.

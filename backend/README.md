@@ -72,3 +72,13 @@ The default URL is a non-routable placeholder and must be replaced with a real H
 - Android integration tests, real endpoint configuration, release signing and full end-to-end acceptance tests.
 
 AJUSTA is not 100% complete. A successful local/CI build or mocked provider test is not evidence of live production behavior.
+
+
+## Evidence verification engine
+
+A deterministic `ajusta_core.verification` module validates structured claim-to-source
+links, identifies declared supporting and contradicting evidence, and reports
+unsupported, contested and invalid references. See [Evidence Verification](../docs/EVIDENCE_VERIFICATION.md).
+
+This is provenance validation, not a truth oracle: source authenticity, excerpt
+entailment and live publisher verification remain outside this module.

@@ -1,7 +1,7 @@
-"""User-owned persistent knowledge records.
+"""User-owned persistent knowledge records with explicit provenance metadata.
 
-This first storage layer saves explicitly supplied text and provenance metadata only;
-it does not claim semantic search, document ingestion, or model training.
+Records are saved knowledge, not model training. Provenance and confidence are
+user-supplied annotations and are never treated as independent truth verification.
 """
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -18,6 +18,8 @@ class KnowledgeRecord:
     title: str
     content: str
     created_at: str
+    source: str | None = None
+    confidence: float | None = None
 
 
 class SQLiteKnowledgeStore:
@@ -33,9 +35,19 @@ class SQLiteKnowledgeStore:
                     user_id TEXT NOT NULL,
                     title TEXT NOT NULL,
                     content TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    source TEXT,
+                    confidence REAL
                 )
             """)
+            # Forward-only, additive migration for databases created by earlier AJUSTA versions.
+            columns = {row["name"] for row in connection.execute(
+                "PRAGMA table_info(knowledge_records)"
+            ).fetchall()}
+            if "source" not in columns:
+                connection.execute("ALTER TABLE knowledge_records ADD COLUMN source TEXT")
+            if "confidence" not in columns:
+                connection.execute("ALTER TABLE knowledge_records ADD COLUMN confidence REAL")
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS knowledge_owner_created_idx "
                 "ON knowledge_records(user_id, created_at DESC, id)"
@@ -85,22 +97,41 @@ class SQLiteKnowledgeStore:
         return KnowledgeRecord(
             id=row["id"], user_id=row["user_id"], title=row["title"],
             content=row["content"], created_at=row["created_at"],
+            source=row["source"], confidence=row["confidence"],
         )
 
-    def create(self, user_id: str, title: str, content: str) -> KnowledgeRecord:
-        if not user_id:
+    def create(
+        self, user_id: str, title: str, content: str, *,
+        source: str | None = None, confidence: float | None = None,
+    ) -> KnowledgeRecord:
+        if not isinstance(user_id, str) or not user_id.strip():
             raise ValueError("user_id is required")
+        if not isinstance(title, str) or not isinstance(content, str):
+            raise TypeError("title and content must be strings")
         title = title.strip()
         content = content.strip()
         if not title or len(title) > 160:
             raise ValueError("title must contain 1 to 160 characters")
         if not content or len(content) > 20000:
             raise ValueError("content must contain 1 to 20000 characters")
+        if source is not None and (
+            not isinstance(source, str) or not source.strip() or len(source.strip()) > 500
+        ):
+            raise ValueError("source must contain 1 to 500 characters when provided")
+        if confidence is not None and (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, (int, float))
+            or not 0.0 <= confidence <= 1.0
+        ):
+            raise ValueError("confidence must be a number between 0 and 1")
+        source = source.strip() if source is not None else None
+        confidence = float(confidence) if confidence is not None else None
         record_id = uuid4().hex
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO knowledge_records(id,user_id,title,content) VALUES(?,?,?,?)",
-                (record_id, user_id, title, content),
+                "INSERT INTO knowledge_records(id,user_id,title,content,source,confidence) "
+                "VALUES(?,?,?,?,?,?)",
+                (record_id, user_id.strip(), title, content, source, confidence),
             )
             row = connection.execute(
                 "SELECT * FROM knowledge_records WHERE id=?", (record_id,)
@@ -108,13 +139,14 @@ class SQLiteKnowledgeStore:
         return self._record(row)
 
     def list_for_user(self, user_id: str) -> tuple[KnowledgeRecord, ...]:
+        if not isinstance(user_id, str) or not user_id:
+            raise ValueError("user_id is required")
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM knowledge_records WHERE user_id=? "
                 "ORDER BY created_at DESC, id DESC", (user_id,)
             ).fetchall()
         return tuple(self._record(row) for row in rows)
-
 
     def search_for_user(
         self, user_id: str, query: str, *, limit: int = 20
@@ -145,6 +177,8 @@ class SQLiteKnowledgeStore:
         return tuple(self._record(row) for row in rows)
 
     def delete(self, user_id: str, record_id: str) -> bool:
+        if not isinstance(user_id, str) or not user_id:
+            raise ValueError("user_id is required")
         with self._connect() as connection:
             cursor = connection.execute(
                 "DELETE FROM knowledge_records WHERE id=? AND user_id=?",

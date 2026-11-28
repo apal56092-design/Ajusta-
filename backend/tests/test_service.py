@@ -118,3 +118,37 @@ def test_task_service_normalizes_task_id_before_persisting(tmp_path):
 
     assert result.task_id == "task-trimmed"
     assert store.get_task("task-trimmed").status is TaskStatus.SUCCEEDED
+
+
+
+def test_service_uses_multi_agent_results_and_records_partial_failures(tmp_path):
+    from ajusta_core.brain import DepartmentRegistry
+    from ajusta_core.contracts import TaskRequest, TaskStatus
+    from ajusta_core.service import TaskExecutionService
+    from ajusta_core.storage import SQLiteTaskStore
+
+    class Agent:
+        def __init__(self, name, fail=False):
+            self.name = name
+            self.fail = fail
+
+        def execute(self, objective, steps):
+            if self.fail:
+                raise RuntimeError("department unavailable")
+            return f"{self.name} analysis"
+
+    registry = DepartmentRegistry()
+    registry.register(Agent("research"))
+    registry.register(Agent("data", fail=True))
+    service = TaskExecutionService(
+        store=SQLiteTaskStore(tmp_path / "multi-agent-service.sqlite3"),
+        registry=registry,
+        enabled_departments={"research", "data"},
+    )
+    result = service.submit("multi-agent-task", TaskRequest("Research data and evidence"))
+
+    assert result.status is TaskStatus.SUCCEEDED
+    assert "[research]" in result.result
+    assert "research analysis" in result.result
+    assert "data" in result.result
+    assert "unavailable:data" in result.evidence

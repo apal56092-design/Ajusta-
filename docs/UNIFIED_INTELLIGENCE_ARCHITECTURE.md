@@ -9,7 +9,7 @@ Build AJUSTA as a unified, measurable, secure AI work system—not as a thin cha
 Owns request intake, identity context, policy checks, task decomposition, capability routing, budget/deadline controls, evidence collection, result verification and response synthesis. It chooses only configured providers and approved tools. It must expose why a route was selected and when it fell back.
 
 ### 2. Specialist agents and departments
-Research, coding, data, design, business and productivity specialists use typed input/output contracts. Delegation is bounded by depth, parallelism, time, token/cost budgets and user permissions. Agents cannot grant themselves permissions or execute arbitrary code. Conflicting outputs are compared and escalated or qualified.
+Research, coding, data, design, business and productivity specialists use typed input/output contracts. The current coordinator dispatches up to six explicitly registered departments with bounded parallelism and a shared deadline, preserves plan order, and reports missing, failed and timed-out departments. Current department adapters are prompt/model workers without independent tool permissions; they cannot grant themselves permissions or execute arbitrary code. Provider-side timeouts remain necessary because Python cannot safely force-stop a running thread. Token/cost budgets, conflict adjudication and deeper delegation remain future work.
 
 ### 3. Reasoning and verification
 Complex tasks are decomposed into explicit steps. Each step records assumptions, evidence, dependencies and completion state. Independent checks validate calculations, citations, code tests and output constraints. Confidence is treated as an estimate, not a guarantee.
@@ -37,10 +37,10 @@ Every department has task-specific benchmark sets. Measure task success, factual
 
 ## Delivery sequence
 
-1. **Reliability foundation:** wire the durable queue to a bounded worker; add idempotency, lease renewal, cancellation, progress, crash recovery and API/Android status synchronization.
+1. **Reliability foundation:** wire the durable queue to a bounded worker; add idempotency, lease renewal, cooperative cancellation, progress, crash recovery and API/Android status synchronization.
 2. **Security foundation:** threat model, rate limits, approval inbox, audit events, secret rotation and sandbox design.
 3. **Intelligence core:** capability registry, provider routing, budgets, typed planning graph, evidence and independent verification.
-4. **Specialists and research:** bounded multi-agent delegation, deep research, source verification and real department workflows.
+4. **Specialists and research:** bounded parallel department coordination is implemented; remaining work includes deep research, source verification, independent evaluation and real department workflows.
 5. **Knowledge and memory:** file ingestion, chunking, provenance, embeddings/knowledge graph and user controls.
 6. **Skills and controlled improvement:** reviewed skill authoring, isolated evaluation, benchmark-driven changes and rollback.
 7. **Multimodal and Android:** image/audio/video/document workflows, permissions, project workspace and full live API integration.

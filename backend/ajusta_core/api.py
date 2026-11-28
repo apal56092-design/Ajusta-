@@ -34,6 +34,8 @@ class KnowledgeSubmission(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = Field(min_length=1, max_length=160)
     content: str = Field(min_length=1, max_length=20000)
+    source: str | None = Field(default=None, min_length=1, max_length=500)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
 
 
 class Credentials(BaseModel):
@@ -220,11 +222,15 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
         if knowledge_store is None:
             raise HTTPException(status_code=503, detail="Knowledge storage is not configured.")
         try:
-            item = knowledge_store.create(user.user_id, body.title, body.content)
+            item = knowledge_store.create(
+                user.user_id, body.title, body.content,
+                source=body.source, confidence=body.confidence,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return {"id": item.id, "title": item.title, "content": item.content,
-                "created_at": item.created_at}
+                "created_at": item.created_at, "source": item.source,
+                "confidence": item.confidence}
 
     @app.get("/v1/knowledge/search")
     def search_knowledge(
@@ -241,7 +247,8 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
             raise HTTPException(status_code=422, detail=str(exc)) from None
         return {"items": [
             {"id": item.id, "title": item.title, "content": item.content,
-             "created_at": item.created_at}
+             "created_at": item.created_at, "source": item.source,
+             "confidence": item.confidence}
             for item in matches
         ]}
 
@@ -252,7 +259,8 @@ def create_app(service: TaskExecutionService, *, api_token: str | None = None,
             raise HTTPException(status_code=503, detail="Knowledge storage is not configured.")
         return {"items": [
             {"id": item.id, "title": item.title, "content": item.content,
-             "created_at": item.created_at}
+             "created_at": item.created_at, "source": item.source,
+             "confidence": item.confidence}
             for item in knowledge_store.list_for_user(user.user_id)
         ]}
 

@@ -160,6 +160,8 @@ def test_service_surfaces_structured_evidence_verification(tmp_path):
     )
 
     class EvidenceAgent:
+        name = "research"
+
         def execute(self, objective, steps):
             return DepartmentEvidenceResponse(
                 text="The report states that costs fell.",

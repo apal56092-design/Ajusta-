@@ -5,6 +5,7 @@ from ajusta_core.api import create_app
 from ajusta_core.auth import SQLiteAuthStore
 from ajusta_core.brain import DepartmentRegistry, register_model_departments
 from ajusta_core.models import ModelResponse
+from ajusta_core.knowledge_store import SQLiteKnowledgeStore
 from ajusta_core.service import TaskExecutionService
 from ajusta_core.storage import SQLiteTaskStore
 
@@ -26,7 +27,8 @@ def client(tmp_path):
         registry=registry,
         enabled_departments={"research", "coding", "design", "data", "business", "automation"},
     )
-    return TestClient(create_app(service, auth_store=auth))
+    knowledge = SQLiteKnowledgeStore(tmp_path / "knowledge.sqlite3")
+    return TestClient(create_app(service, auth_store=auth, knowledge_store=knowledge))
 
 
 def register(client, email):
@@ -83,4 +85,40 @@ def test_registration_validation(client):
         "/v1/auth/register",
         json={"email": "not-email", "password": "short"},
     )
+    assert response.status_code == 422
+
+
+
+def test_knowledge_api_persists_and_returns_provenance_for_owner(client):
+    register(client, "first@example.com")
+    headers = login(client, "first@example.com")
+    created = client.post(
+        "/v1/knowledge",
+        headers=headers,
+        json={
+            "title": "Solar panel note",
+            "content": "The cited report estimates 22 percent efficiency.",
+            "source": "https://example.org/report",
+            "confidence": 0.72,
+        },
+    )
+
+    assert created.status_code == 201
+    assert created.json()["source"] == "https://example.org/report"
+    assert created.json()["confidence"] == 0.72
+
+    listed = client.get("/v1/knowledge", headers=headers)
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["source"] == "https://example.org/report"
+
+
+def test_knowledge_api_rejects_out_of_range_confidence(client):
+    register(client, "first@example.com")
+    headers = login(client, "first@example.com")
+    response = client.post(
+        "/v1/knowledge",
+        headers=headers,
+        json={"title": "Note", "content": "Content", "confidence": 1.5},
+    )
+
     assert response.status_code == 422

@@ -7,7 +7,7 @@ AJUSTA is an ambitious, modular AI ecosystem designed as a Jarvis-inspired opera
 
 Its goal is to help people move from an objective to a well-researched, verified and useful result: understand the request, plan the work, select appropriate capabilities, coordinate execution, evaluate the outcome and explain what was completed.
 
-**Important project-status statement:** The repository now includes an initial Python backend foundation: deterministic request planning, typed task request/result contracts, a central orchestration boundary, department-availability reporting, a consequential-action approval gate, a declarative in-memory skill registry with reviewed lifecycle states, unit-test specifications, and a GitHub Actions test workflow. These components create plans only; they do not yet connect real AI providers, execute specialist work, or provide a production app. Other features remain planned until implemented and verified.
+**Current project-status statement (2026-11-28):** AJUSTA has a working Python backend foundation with deterministic planning, authenticated user sessions, multiple server-side model-provider adapters and fallback routing, specialist department execution, a bounded multi-agent coordinator, source-evidence verification, persistent SQLite task/skill/knowledge stores, governed skill execution, durable task queues and workers, async task progress/cancellation, privacy-safe model-routing telemetry, and a governed supervised-training dataset/run engine. The Kotlin Android client has task submission and progress integration. These are implemented components, not proof of production deployment or superiority over other AI systems. Live provider calls require valid server credentials; actual weight training requires a deployment-registered framework-specific trainer and suitable compute. See the current implementation docs and CI results before treating any capability as production-ready.
 
 ---
 
@@ -42,7 +42,10 @@ Independent modules with clear interfaces and responsibilities:
 - **Knowledge:** document ingestion, retrieval and project context.
 
 ### Shared Knowledge and Adaptive Storage
-A controlled layer for storing and retrieving project documents, approved knowledge, task context and references. Storage should scale through replaceable local or cloud adapters, with encryption, backups, access controls, retention, export and deletion. External storage and paid capacity require user consent.
+A persistent SQLite knowledge store now supports owner-scoped records, full-text search, source provenance annotations, and authenticated create/list/search/delete APIs. Broader document ingestion, embeddings, encrypted cloud storage, backup/restore, and retention automation remain future work.
+
+### Governed Training and Learning
+A supervised-training foundation now provides owner-scoped datasets, reviewed input/target examples, bounded JSON configuration, explicit approval, host-registered trainer adapters, persisted run status, sanitized failures, and numeric metrics. Actual fine-tuning is not claimed until a real framework adapter, compute, evaluation, and artifact lifecycle are configured. See [docs/TRAINING_SYSTEM.md](docs/TRAINING_SYSTEM.md).
 
 ### Skill Learning and Improvement
 AJUSTA should discover capability gaps, research solutions, draft new skills, test them in isolated environments, evaluate results and activate approved versions with rollback. This is controlled, evidence-based improvement—not unrestricted self-modification.
@@ -67,16 +70,18 @@ Provider-neutral adapters will make it possible to connect different AI models a
 
 | Area | Intended responsibility | Status |
 |---|---|---|
-| Central Intelligence | Initial deterministic planning and routing boundary | Partial |
-| Research | Evidence-based investigation | Planned |
-| Coding | Software engineering workflows | Planned |
-| Design | Product and interface design support | Planned |
-| Data Intelligence | Data quality and analysis | Planned |
-| Business Intelligence | Business research and planning | Planned |
-| Knowledge System | Document and context retrieval | Planned |
-| Automation | Permissioned workflow execution | Planned |
-| Android Client | Mobile user interface | Planned |
-| Security & Governance | Initial consequential-action approval gate | Partial |
+| Central Intelligence | Deterministic planning, department dispatch, bounded multi-agent coordination | Partial / implemented foundation |
+| Model Routing | Server-side provider adapters, fallback and privacy-safe attempt telemetry | Implemented; live credentials deployment-dependent |
+| Research | Configurable search adapter and source evidence structures | Partial |
+| Coding | Specialist department adapter and task coordination | Partial |
+| Design | Specialist department adapter and task coordination | Partial |
+| Data / Business | Specialist department adapters | Partial |
+| Knowledge System | Persistent owner-scoped FTS knowledge and provenance annotations | Implemented foundation |
+| Training System | Curated datasets, explicit approval, trusted trainer registry, run metrics | Implemented orchestration; real trainer not yet provisioned |
+| Skills | Persistent catalog, permissioned host operations, audit records | Partial |
+| Automation | Durable task queue, worker, progress and cooperative cancellation | Partial |
+| Android Client | Authenticated API and async task progress integration | Partial |
+| Security & Governance | User sessions, owner isolation, permissions, approval gates, evidence checks | Partial; ongoing hardening |
 
 ## 5. Technology Direction
 
@@ -151,37 +156,22 @@ The target design—including Jarvis-style orchestration, broad skill discovery,
 
 ## 10. Development Roadmap
 
-### Phase 0 — Foundation
-- Confirm repository conventions.
-- Document architecture and project decisions.
-- Add secure configuration and contribution guidance.
+### Implemented foundation
+- Authenticated API and owner-scoped SQLite storage.
+- Model-provider adapters, routing, and fallback telemetry.
+- Multi-agent department coordination and evidence verification.
+- Durable task queue, worker, progress events, and cooperative cancellation.
+- Persistent knowledge and governed skill execution.
+- Training datasets, approval gates, and trainer adapter interface.
+- Android async task integration.
 
-### Phase 1 — Central Intelligence MVP
-- Define a request/task data model.
-- Implement a small, deterministic task planner.
-- Add validation and unit tests.
-- Return transparent task status and errors.
-
-### Phase 2 — First Specialist Department
-- Add a research or coding department behind a stable interface.
-- Test routing, result handling and failure behavior.
-
-### Phase 3 — Model Connectors
-- Add provider adapters with explicit configuration.
-- Handle timeouts, rate limits, unavailable providers and cost visibility.
-
-### Phase 4 — Knowledge System
-- Add document ingestion, indexing, retrieval and access controls.
-
-### Phase 5 — Android Client
-- Build the Kotlin interface and connect it to authenticated backend APIs.
-
-### Phase 6 — Controlled Automation
-- Add user-approved workflows, audit logs and permission checks.
-
-### Phase 7 — Evaluation and Expansion
-- Measure quality, reliability, latency and cost.
-- Expand capabilities only when they can be tested and maintained.
+### Next engineering milestones
+- Register and validate a real framework-specific training adapter.
+- Add train/validation/test splitting, dataset quality checks, and leakage detection.
+- Add evaluation gates, checkpoint/artifact storage, versioning, rollback, and human promotion.
+- Add long-running training jobs with durable scheduling, progress, resource limits, and cancellation.
+- Complete Android training/knowledge interfaces and backend end-to-end tests.
+- Deploy staging infrastructure and verify live model/provider behavior with authorized credentials.
 
 ## 11. Project Principles
 
@@ -196,9 +186,9 @@ The target design—including Jarvis-style orchestration, broad skill discovery,
 
 ## 12. Current Status
 
-**Current stage: Backend orchestration foundation.**
+**Current stage: Expanding backend intelligence and governed learning foundation.**
 
-The repository contains a deterministic planner, a central orchestration API, a policy approval gate, unit-test specifications, and a CI workflow intended to run the backend tests. This is not yet a connected multi-model AI system: real specialist execution, AI provider adapters, persistent skill storage, sandboxed skill execution, knowledge storage, authentication, and the Kotlin Android client still require implementation. Test status must be confirmed from an actual CI run before calling the tests passing.
+The repository contains working backend modules for authenticated orchestration, provider adapters, specialist coordination, evidence verification, persistent owner-scoped knowledge, durable async tasks, governed skill execution, and supervised-training orchestration. Backend tests run in GitHub Actions. The training engine currently manages curated datasets and calls only trusted host-registered trainer adapters; no framework-specific LLM fine-tuning adapter or GPU infrastructure is bundled. The Android client is partially integrated. Production deployment, live provider credentials, real model training, evaluation gates, artifact promotion, and additional end-to-end validation remain open work.
 
 ---
 

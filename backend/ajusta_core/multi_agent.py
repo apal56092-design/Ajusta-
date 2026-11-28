@@ -13,6 +13,7 @@ from typing import Callable
 from .brain import DepartmentRegistry
 from .orchestrator import ExecutionPlan
 from .models import ModelAuthenticationError, ModelUnavailableError
+from .verification import DepartmentEvidenceResponse, VerificationReport, verify_claims
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class AgentOutcome:
     status: str
     output: str | None = None
     error_code: str | None = None
+    evidence_verification: VerificationReport | None = None
 
 
 @dataclass(frozen=True)
@@ -91,10 +93,16 @@ def coordinate_agents(
             name = futures[future]
             try:
                 output = future.result()
-                if not isinstance(output, str) or not output.strip():
-                    outcomes[name] = AgentOutcome(name, "failed", error_code="EMPTY_OUTPUT")
-                else:
+                if isinstance(output, DepartmentEvidenceResponse):
+                    verification = verify_claims(output.claims, output.evidence)
+                    outcomes[name] = AgentOutcome(
+                        name, "succeeded", output=output.text.strip(),
+                        evidence_verification=verification,
+                    )
+                elif isinstance(output, str) and output.strip():
                     outcomes[name] = AgentOutcome(name, "succeeded", output=output.strip())
+                else:
+                    outcomes[name] = AgentOutcome(name, "failed", error_code="EMPTY_OUTPUT")
             except ModelAuthenticationError:
                 outcomes[name] = AgentOutcome(name, "failed", error_code="MODEL_AUTHENTICATION_FAILED")
             except ModelUnavailableError:
